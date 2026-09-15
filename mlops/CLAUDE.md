@@ -34,46 +34,20 @@ FPR, alert volume against budget, and expected cost. ROC-AUC alone is never a pr
 
 ---
 
-## Git
+## Lab-wide conventions
 
-**Never run a Git command.** Not `add`, `commit`, `push`, `pull`, `fetch`, `merge`, `rebase`,
-`checkout`, `branch`, `stash`, `reset`, or `status` — and no `gh` commands either. This includes
-read-only commands.
+The repository root `CLAUDE.md` carries the conventions that apply everywhere: presentation
+standard, Git handling, commit style, and the work-session protocol. Read it. The rules below
+are additional to those, never a replacement.
 
-I run every Git operation myself, by hand, in my own terminal. This is deliberate: I want to see
-and approve every change to the history, and agent-run Git has left stale lock files in
-`.git/` before.
+Two from that file are restated here because the cost of missing them is high:
 
-When work is ready to be committed, stop and tell me, and propose a commit message in the style
-below. Do not offer to run it. If you need to know what changed, read the files directly rather
-than reaching for `git diff`.
+**Never run a Git command**, including read-only ones. Every Git operation is run by the
+repository owner in his own terminal. When work is ready to commit, stop, say so, and propose
+a message.
 
----
-
-## Commit and PR conventions
-
-Commit subjects are a plain imperative sentence in normal English. **No type prefixes, no scopes,
-no colons, no tags.**
-
-```
-Add as-of aggregation for bureau balance
-Propagate request id into the prediction log
-Fix sentinel handling in DAYS_EMPLOYED
-```
-
-Not `feat(features): ...`, not `docs: ...`, not `[MLOPS] ...`.
-
-Subject under ~70 characters. Reasoning goes in the body after a blank line, not in a
-machine-readable prefix.
-
-**Do not add `Co-Authored-By` trailers, `Generated with` lines, tool URLs, or any other
-attribution footer to commits or PR descriptions.** Leave the commit message as written.
-
-Branch names are short and descriptive, no prefixes: `as-of-bureau-aggregation`,
-`serving-request-ids`.
-
-Commit in small, coherent increments — one logical change per commit. Do not batch unrelated work
-into a single large commit.
+**No emoji in any artifact** — documentation, commit messages, code comments, Notion pages or
+status indicators in tables.
 
 ---
 

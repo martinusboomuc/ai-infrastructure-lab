@@ -22,16 +22,16 @@ state of the build and is updated with every merged change.
 
 | Component | Status |
 |---|---|
-| Documentation, architecture, ADRs | 🟡 In progress |
-| Repository scaffolding, tooling, CI | ⬜ Not started |
-| Data ingestion + schema validation | ⬜ Not started |
-| Feature pipeline (point-in-time correct) | ⬜ Not started |
-| Training pipeline + experiment tracking | ⬜ Not started |
-| Model registry + model cards | ⬜ Not started |
-| Serving API | ⬜ Not started |
-| Monitoring + drift detection | ⬜ Not started |
-| Cloud deployment | ⬜ Not started |
-| Second domain (portability proof) | ⬜ Not started |
+| Documentation, architecture, ADRs | In progress |
+| Repository scaffolding, tooling, CI | Not started |
+| Data ingestion + schema validation | Not started |
+| Feature pipeline (point-in-time correct) | Not started |
+| Training pipeline + experiment tracking | Not started |
+| Model registry + model cards | Not started |
+| Serving API | Not started |
+| Monitoring + drift detection | Not started |
+| Cloud deployment | Not started |
+| Second domain (portability proof) | Not started |
 
 ---
 
