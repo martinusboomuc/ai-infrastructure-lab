@@ -27,6 +27,14 @@ scripts/
 assets/
 ```
 
+## Flagship Project — BankML Platform
+
+[**`mlops/`**](mlops/) contains **BankML Platform**: a production-inspired MLOps platform for
+banking machine learning, with its own architecture, roadmap and architecture decision records.
+
+It is the largest project in this lab and is developed as a standalone product — see
+[`mlops/README.md`](mlops/README.md).
+
 ## Technology Stack
 
 - Linux
