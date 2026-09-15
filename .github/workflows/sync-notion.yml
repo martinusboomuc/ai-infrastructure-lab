@@ -1,0 +1,41 @@
+name: Sync project state to Notion
+
+# The repository is the source of truth for project state. This workflow pushes
+# the derived values (current phase, progress, decision count) into the Notion
+# Projects database. It never reads state back, so the two can never conflict.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mlops/ROADMAP.md'
+      - 'mlops/docs/decisions/**'
+      - 'scripts/sync_notion.py'
+      - '.github/workflows/sync-notion.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-notion
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify the roadmap parses
+        run: python3 scripts/sync_notion.py --dry-run
+
+      - name: Push state to Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_PROJECT_PAGE_ID: ${{ vars.NOTION_PROJECT_PAGE_ID }}
+        run: python3 scripts/sync_notion.py
