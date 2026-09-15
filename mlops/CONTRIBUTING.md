@@ -22,16 +22,21 @@ Python 3.12. Dependencies are managed with `uv`; `uv.lock` is committed and CI i
 Work happens on branches off `main`. `main` is always in a state where `make lint && make test`
 passes.
 
-Branch names: `feat/<short-description>`, `fix/<short-description>`, `docs/<short-description>`,
-`chore/<short-description>`.
+Branch names are short and descriptive: `as-of-bureau-aggregation`, `serving-request-ids`,
+`defer-feature-store-adr`.
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
+Commit subjects are written as a plain imperative sentence — what the commit does, in normal
+English. No type prefixes, no scopes, no tags.
 
 ```
-feat(features): add as-of aggregation for bureau balance
-fix(serving): propagate request id into prediction log
-docs(adr): record decision to defer the feature store
+Add as-of aggregation for bureau balance
+Propagate request id into the prediction log
+Record the decision to defer the feature store
+Fix sentinel handling in DAYS_EMPLOYED
 ```
+
+Keep the subject under ~70 characters. If the change needs justification, put it in the body
+after a blank line — the body is where the reasoning belongs, not in a machine-readable prefix.
 
 ---
 

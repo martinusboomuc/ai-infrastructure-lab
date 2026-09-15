@@ -1,0 +1,55 @@
+# Data — never committed. Tracked by DVC against a private remote.
+data/
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.zip
+*.gz
+*.7z
+
+# DVC internals (dvc.lock, dvc.yaml and *.dvc pointers ARE committed)
+.dvc/cache/
+.dvc/tmp/
+.dvc/config.local
+
+# MLflow
+mlruns/
+mlartifacts/
+mlflow.db
+
+# Model artifacts
+models/
+*.pkl
+*.joblib
+*.onnx
+*.cbm
+*.lgb
+
+# Generated reports
+reports/
+monitoring/reports/
+
+# Environment
+.env
+.env.local
+.venv/
+venv/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# macOS, including junk written onto external drives
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd

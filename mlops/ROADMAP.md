@@ -6,7 +6,7 @@ project is fiction; the order is what matters.
 
 ---
 
-## Phase 0 — Foundations
+## Phase 0 — Foundations *(next)*
 
 Repository scaffolding and the tooling that every later phase depends on.
 
@@ -21,13 +21,14 @@ checks pass in CI.
 
 ---
 
-## Phase 1 — Documentation and decisions *(current)*
+## Phase 1 — Documentation and decisions *(done, ahead of Phase 0)*
 
 - [x] README as product spec, with an honest status table
 - [x] ARCHITECTURE.md
 - [x] ROADMAP.md, CONTRIBUTING.md
 - [x] Initial ADRs
 - [x] Dataset catalogue with licensing caveats
+- [x] Working conventions (`CLAUDE.md`), environment config, local setup guide
 - [ ] Domain config schema drafted for Credit Risk
 
 **Exit criteria:** a reader can tell, from the repository alone, what is built, what is planned,
