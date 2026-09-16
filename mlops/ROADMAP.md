@@ -10,10 +10,10 @@ project is fiction; the order is what matters.
 
 Repository scaffolding and the tooling that every later phase depends on.
 
-- [ ] `uv` project, Python 3.12, locked dependencies
-- [ ] `ruff` + `pre-commit`, `pytest`, `Makefile` with `make setup | lint | test | train | serve`
-- [ ] GitHub Actions: lint and test on every PR
-- [ ] `src/bankml` package skeleton, `configs/` layout
+- [x] `uv` project, Python 3.12, locked dependencies
+- [x] `ruff` + `pre-commit`, `pytest`, `Makefile` with `make setup | lint | test | train | serve`
+- [x] GitHub Actions: lint and test on every PR
+- [x] `src/bankml` package skeleton, `configs/` layout
 - [ ] Azure subscription with a **budget alert configured before any resource exists**
 
 **Exit criteria:** `make setup && make lint && make test` passes from a clean clone, and the same
