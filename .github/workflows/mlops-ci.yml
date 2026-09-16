@@ -1,0 +1,36 @@
+name: BankML lint and test
+
+on:
+  pull_request:
+    paths:
+      - 'mlops/**'
+      - '.github/workflows/mlops-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mlops-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mlops
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: '0.9.25'
+
+      - name: Install dependencies from the locked environment
+        run: uv sync --locked
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
