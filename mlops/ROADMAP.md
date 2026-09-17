@@ -6,7 +6,7 @@ project is fiction; the order is what matters.
 
 ---
 
-## Phase 0 — Foundations *(next)*
+## Phase 0 — Foundations *(done)*
 
 Repository scaffolding and the tooling that every later phase depends on.
 
@@ -14,7 +14,7 @@ Repository scaffolding and the tooling that every later phase depends on.
 - [x] `ruff` + `pre-commit`, `pytest`, `Makefile` with `make setup | lint | test | train | serve`
 - [x] GitHub Actions: lint and test on every PR
 - [x] `src/bankml` package skeleton, `configs/` layout
-- [ ] Azure subscription with a **budget alert configured before any resource exists**
+- [x] Azure subscription with a **budget alert configured before any resource exists**
 
 **Exit criteria:** `make setup && make lint && make test` passes from a clean clone, and the same
 checks pass in CI.
