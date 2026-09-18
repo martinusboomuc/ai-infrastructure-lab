@@ -1,5 +1,8 @@
 # Data — never committed. Tracked by DVC against a private remote.
-data/
+# Not a blanket data/ ignore: DVC's .dvc pointer files live under data/ too and
+# must be trackable by git. dvc add already writes a precise .gitignore entry
+# for each raw file it tracks; this just covers the cache dir and raw extensions.
+data/.dvc-cache/
 *.csv
 *.tsv
 *.parquet
