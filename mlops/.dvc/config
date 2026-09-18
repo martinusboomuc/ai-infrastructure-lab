@@ -1,0 +1,6 @@
+[core]
+    analytics = false
+[cache]
+    dir = ../data/.dvc-cache
+    type = "hardlink,symlink"
+    shared = group

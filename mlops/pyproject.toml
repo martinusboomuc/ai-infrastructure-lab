@@ -3,7 +3,9 @@ name = "bankml"
 version = "0.1.0"
 description = "BankML Platform: a production-inspired MLOps platform for banking ML"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "dvc[azure]>=3.67.1",
+]
 
 [build-system]
 requires = ["hatchling"]
