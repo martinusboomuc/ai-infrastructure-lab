@@ -27,6 +27,15 @@ scripts/
 assets/
 ```
 
+## Infrastructure
+
+This lab runs on hybrid infrastructure — a homelab for self-hosted services, public cloud for
+managed ones — see [`docs/decisions/0001-hybrid-infrastructure.md`](docs/decisions/0001-hybrid-infrastructure.md)
+for why, [`docs/architecture/homelab-architecture.md`](docs/architecture/homelab-architecture.md)
+for the current hardware and role split, and
+[`docs/network/network-topology.md`](docs/network/network-topology.md) for what's configured and
+what's still open.
+
 ## Flagship Project — BankML Platform
 
 [**`mlops/`**](mlops/) contains **BankML Platform**: a production-inspired MLOps platform for
