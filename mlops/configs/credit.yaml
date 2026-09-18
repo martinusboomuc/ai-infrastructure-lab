@@ -1,8 +1,4 @@
 # Credit Risk domain config.
-#
-# Numeric thresholds marked "provisional" are placeholders pending real EDA once the raw
-# data exists locally (Phase 2, Stage 3). They are not fabricated precision — they are a
-# starting point to unblock the config schema and the split/feature code that reads it.
 
 domain: credit
 
@@ -20,18 +16,33 @@ raw_data:
     - installments_payments.csv
     - credit_card_balance.csv
 
-# Home Credit's timestamps are relative day-offsets (DAYS_BIRTH, DAYS_DECISION, ...), not
-# real dates. There is no true "application date" in the raw data, so this project needs a
-# synthetic anchor to turn day-offsets into an as-of timestamp axis. The anchor policy below
-# is a placeholder — finalized once the real columns are inspected (Phase 2, Stage 3).
-temporal:
-  anchor_policy: provisional # e.g. a fixed reference date the DAYS_* offsets count backward from
-  decision_timestamp_column: DAYS_DECISION # on previous_application; main table's own as-of
-                                            # timestamp still needs deciding in Stage 3
+# ADR-0008: no real application date exists anywhere in the raw data. Every DAYS_*/
+# MONTHS_BALANCE column across all 7 tables (confirmed against HomeCredit_columns_description.csv)
+# is relative to this one synthetic per-SK_ID_CURR anchor, not to each other. APPLICATION_DATE is
+# constructed by ranking applications by SK_ID_CURR ascending and linearly mapping rank onto this
+# window. These are not real Home Credit application dates.
+synthetic_anchor:
+  start: 2016-01-01
+  end: 2018-06-30
 
-# ADR-0004: chronological split with an explicit gap window, and a label maturity window.
-gap_window_days: 90 # provisional
-label_maturity_days: 365 # provisional; ADR-0004 cites 12-24 months for default risk
+# ADR-0004: chronological split with an explicit gap window. Dates are synthetic (see
+# synthetic_anchor / ADR-0008) — window reused verbatim from ARCHITECTURE.md's own example.
+split:
+  train:
+    from: 2016-01-01
+    to: 2017-06-30
+  gap_days: 30
+  validation:
+    from: 2017-08-01
+    to: 2017-12-31
+  test:
+    from: 2018-01-01
+    to: 2018-06-30
+
+# ADR-0004: label maturity window. 540 days (~18 months) sits within ADR-0004's cited
+# 12-24 month range for default risk, and matches ARCHITECTURE.md's own example.
+label:
+  maturity_days: 540
 
 # Values with a special meaning other than their literal number. 365243 is Home Credit's
 # generic "not applicable" placeholder for a DAYS_* column, not unique to DAYS_EMPLOYED —
