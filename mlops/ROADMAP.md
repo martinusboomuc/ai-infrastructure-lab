@@ -36,7 +36,7 @@ and why each contested technical choice was made.
 
 ---
 
-## Phase 2 — Data platform (Credit Risk)
+## Phase 2 — Data platform (Credit Risk) *(done)*
 
 Home Credit only. This is where the hardest thinking happens.
 
@@ -44,9 +44,9 @@ Home Credit only. This is where the hardest thinking happens.
 - [x] DVC configured against a private Azure Blob remote
 - [x] Pandera contracts for every table, enforced at the `raw → validated` boundary
 - [x] Temporal split configuration with an explicit gap window
-- [ ] Label maturity window applied and documented
-- [ ] Feature pipeline with as-of-timestamp aggregations
-- [ ] **Leakage test in CI**: features built against the full table and against the
+- [x] Label maturity window applied and documented
+- [x] Feature pipeline with as-of-timestamp aggregations
+- [x] **Leakage test in CI**: features built against the full table and against the
       timestamp-truncated table are identical
 
 **Exit criteria:** `make features DOMAIN=credit` reproduces a byte-identical feature set from a
