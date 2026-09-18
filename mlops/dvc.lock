@@ -1,0 +1,33 @@
+schema: '2.0'
+stages:
+  features_credit:
+    cmd: uv run python -m bankml.features.credit.pipeline
+    deps:
+    - path: configs/credit.yaml
+      hash: md5
+      md5: 76a4272590463b6c6d5441d55a4498dd
+      size: 2199
+    - path: data/raw/credit
+      hash: md5
+      md5: dc758cb39cac8b2a03f93fa875ce9717.dir
+      size: 2684263324
+      nfiles: 18
+    - path: src/bankml/features/credit
+      hash: md5
+      md5: 3fe04f63306b856c28f07e6c7fcf6363.dir
+      size: 26721
+      nfiles: 8
+    - path: src/bankml/splitting.py
+      hash: md5
+      md5: 4fb29d7600301e3fe48628770f472447
+      size: 2983
+    - path: src/bankml/validation/credit
+      hash: md5
+      md5: 7c5947ce3fa4c8bfff5c100ea83b32b2.dir
+      size: 49904
+      nfiles: 16
+    outs:
+    - path: data/processed/credit/features.parquet
+      hash: md5
+      md5: 05872cbfe9d833c49c9eb21299b8da82
+      size: 12743367

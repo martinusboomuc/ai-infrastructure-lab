@@ -1,4 +1,4 @@
-.PHONY: setup lint test check-data data
+.PHONY: setup lint test check-data data features
 
 setup:
 	uv sync
@@ -17,3 +17,6 @@ check-data:
 
 data: check-data
 	uv run dvc pull
+
+features: check-data
+	uv run dvc repro features_$(DOMAIN)

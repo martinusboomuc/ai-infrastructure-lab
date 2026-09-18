@@ -1,0 +1,11 @@
+stages:
+  features_credit:
+    cmd: uv run python -m bankml.features.credit.pipeline
+    deps:
+      - src/bankml/features/credit
+      - src/bankml/splitting.py
+      - src/bankml/validation/credit
+      - configs/credit.yaml
+      - data/raw/credit
+    outs:
+      - data/processed/credit/features.parquet
