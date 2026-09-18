@@ -1,6 +1,15 @@
+# Scoped to mlops/ only. This hook installs into the shared repo-root .git/hooks, and pre-commit
+# scans the whole repository by default — without this, `--all-files` (and even a normal commit
+# touching files outside mlops/) applies BankML's own ruff config to unrelated lab code, where
+# mlops/pyproject.toml can't be found, so ruff silently falls back to its own generic defaults
+# instead of erroring. Found by actually running the hook, not by inspection. ADR-0001 already
+# establishes mlops/ as its own project root for exactly this reason — this makes pre-commit
+# actually honor that boundary.
+files: ^mlops/
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.16.7
     hooks:
       - id: ruff
         args: [--fix]
