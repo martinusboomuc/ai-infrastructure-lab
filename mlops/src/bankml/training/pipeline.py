@@ -16,8 +16,13 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from bankml.evaluation.explain import compute_reason_codes
 from bankml.evaluation.metrics import compute_metrics
 from bankml.evaluation.slices import compute_slice_metrics
+from bankml.registry.gate import evaluate_gate
+from bankml.registry.model_card import generate_model_card
+from bankml.registry.promote import promote_to_production
+from bankml.tracking import log_run
 from bankml.training.gbm import fit_lightgbm
 from bankml.training.scorecard import fit_scorecard
 
@@ -66,7 +71,7 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
     X_train = _prepare_features(train_df, feature_columns)
     y_train = train_df["TARGET"]
 
-    results: dict = {"models": {}, "metrics": {}, "slice_metrics": {}}
+    results: dict = {"models": {}, "metrics": {}, "slice_metrics": {}, "reason_codes": {}}
 
     for role in ("champion", "challenger"):
         model_type = config["modelling"][role]
@@ -92,6 +97,10 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
             results["slice_metrics"][role][split_name] = compute_slice_metrics(
                 split_df, y_split, y_score, config["evaluation"]
             )
+
+        explain_split = splits.get("test", train_df)
+        X_explain = _prepare_features(explain_split, feature_columns)
+        results["reason_codes"][role] = compute_reason_codes(model, model_type, X_explain)
 
     return results
 
@@ -127,6 +136,37 @@ def main(domain: str = "credit") -> None:
 
     results = train_and_evaluate(features_df, config)
     _print_report(results, config)
+
+    for role in ("champion", "challenger"):
+        model_type = config["modelling"][role]
+        model_card = generate_model_card(
+            domain, role, model_type, results["metrics"][role], results["slice_metrics"][role]
+        )
+        run_id = log_run(
+            role,
+            model_type,
+            results["models"][role],
+            results["metrics"][role],
+            results["slice_metrics"][role],
+            results["reason_codes"][role],
+            model_card,
+            mlops_root,
+        )
+        print(f"\nLogged {role} to MLflow run {run_id}")
+
+        if role == "champion":
+            gate_result = evaluate_gate(
+                results["metrics"][role]["test"],
+                results["slice_metrics"][role]["test"],
+                results["reason_codes"][role],
+                model_card,
+                config,
+            )
+            if gate_result.passed:
+                version = promote_to_production(run_id, f"{domain}-champion")
+                print(f"Gate PASSED — promoted {domain}-champion v{version} to production")
+            else:
+                print(f"Gate FAILED — not promoted. Reasons: {gate_result.reasons}")
 
 
 if __name__ == "__main__":
