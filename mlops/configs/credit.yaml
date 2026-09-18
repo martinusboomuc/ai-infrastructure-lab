@@ -90,3 +90,8 @@ evaluation:
       tolerance: 0.05 # max allowed PR-AUC drop on any slice value vs. overall
     - column: NAME_EDUCATION_TYPE
       tolerance: 0.05
+  # Promotion gate (roadmap: "a promotion gate that can actually block"). Evaluates the
+  # champion's test-split results only — see src/bankml/registry/gate.py's module docstring.
+  # Provisional floor, comfortably below the champion's observed ~0.22 test PR-AUC.
+  gate:
+    min_pr_auc: 0.15
