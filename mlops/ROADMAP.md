@@ -43,7 +43,7 @@ Home Credit only. This is where the hardest thinking happens.
 - [x] Ingestion of all 7 Home Credit tables into `raw/`
 - [x] DVC configured against a private Azure Blob remote
 - [x] Pandera contracts for every table, enforced at the `raw → validated` boundary
-- [ ] Temporal split configuration with an explicit gap window
+- [x] Temporal split configuration with an explicit gap window
 - [ ] Label maturity window applied and documented
 - [ ] Feature pipeline with as-of-timestamp aggregations
 - [ ] **Leakage test in CI**: features built against the full table and against the
