@@ -56,10 +56,10 @@ clean clone at a given DVC revision, and the leakage test is green in CI.
 
 ## Phase 3 — Modelling and registry (Credit Risk)
 
-- [ ] WoE binning + logistic scorecard (champion) via `optbinning`
-- [ ] LightGBM challenger
-- [ ] Cost-sensitive evaluation: PR-AUC, recall @ fixed FPR, alert volume, expected cost
-- [ ] Slice metrics with configured tolerances
+- [x] WoE binning + logistic scorecard (champion) via `optbinning`
+- [x] LightGBM challenger
+- [x] Cost-sensitive evaluation: PR-AUC, recall @ fixed FPR, alert volume, expected cost
+- [x] Slice metrics with configured tolerances
 - [ ] SHAP reason codes for both models
 - [ ] MLflow tracking: params, metrics, artifacts, DVC data version, git SHA
 - [ ] MLflow Model Registry with a promotion gate that can actually block
