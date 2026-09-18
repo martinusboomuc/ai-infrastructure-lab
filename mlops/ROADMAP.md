@@ -41,7 +41,7 @@ and why each contested technical choice was made.
 Home Credit only. This is where the hardest thinking happens.
 
 - [ ] Ingestion of all 7 Home Credit tables into `raw/`
-- [ ] DVC configured against a private Azure Blob remote
+- [x] DVC configured against a private Azure Blob remote
 - [ ] Pandera contracts for every table, enforced at the `raw → validated` boundary
 - [ ] Temporal split configuration with an explicit gap window
 - [ ] Label maturity window applied and documented

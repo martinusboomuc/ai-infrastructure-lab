@@ -1,6 +1,9 @@
 [core]
     analytics = false
+    remote = azremote
 [cache]
     dir = ../data/.dvc-cache
     type = "hardlink,symlink"
     shared = group
+['remote "azremote"']
+    url = azure://dvc-remote
