@@ -25,6 +25,28 @@ from bankml.splitting import apply_label_maturity, chronological_split
 
 CONFIG_PATH = Path(__file__).resolve().parents[4] / "configs" / "credit.yaml"
 
+# Static applicant attributes, intrinsic to the application itself — no as-of/leakage concern,
+# unlike the relational-table aggregates. CODE_GENDER is deliberately included here (for slice
+# metrics) but excluded from model inputs in bankml.training.pipeline — see ADR discussion:
+# a protected attribute as a training feature is a fair-lending problem, not a style choice.
+BASE_APPLICANT_COLUMNS = [
+    "CODE_GENDER",
+    "DAYS_BIRTH",
+    "DAYS_EMPLOYED",
+    "AMT_INCOME_TOTAL",
+    "AMT_CREDIT",
+    "AMT_ANNUITY",
+    "NAME_EDUCATION_TYPE",
+    "NAME_FAMILY_STATUS",
+    "NAME_HOUSING_TYPE",
+    "CNT_CHILDREN",
+    "EXT_SOURCE_1",
+    "EXT_SOURCE_2",
+    "EXT_SOURCE_3",
+]
+
+DAYS_EMPLOYED_SENTINEL = 365243  # "not employed" — see configs/credit.yaml's sentinel_values
+
 
 def load_config(config_path: Path = CONFIG_PATH) -> dict:
     with open(config_path) as f:
@@ -46,8 +68,13 @@ def build_features(raw_tables: dict[str, pd.DataFrame], config: dict) -> pd.Data
     anchor = config["synthetic_anchor"]
     application_dates = compute_application_dates(application_df, anchor["start"], anchor["end"])
 
-    base = application_df[["SK_ID_CURR", "TARGET"]].copy()
+    base = application_df[["SK_ID_CURR", "TARGET", *BASE_APPLICANT_COLUMNS]].copy()
     base["APPLICATION_DATE"] = base["SK_ID_CURR"].map(application_dates)
+
+    is_sentinel = base["DAYS_EMPLOYED"] == DAYS_EMPLOYED_SENTINEL
+    base["DAYS_EMPLOYED_IS_SENTINEL"] = is_sentinel
+    base["DAYS_EMPLOYED"] = base["DAYS_EMPLOYED"].astype(float)
+    base.loc[is_sentinel, "DAYS_EMPLOYED"] = float("nan")
 
     aggregates = [
         bureau_aggregates(raw_tables["bureau"], raw_tables["bureau_balance"], application_dates),
@@ -71,7 +98,7 @@ def build_features(raw_tables: dict[str, pd.DataFrame], config: dict) -> pd.Data
     features[sum_cols] = features[sum_cols].fillna(0.0)
 
     features["SPLIT"] = chronological_split(features, "APPLICATION_DATE", config["split"])
-    as_of = pd.Timestamp(anchor["end"])
+    as_of = pd.Timestamp(config["label"]["as_of"])
     features["IS_MATURE"] = apply_label_maturity(
         features, "APPLICATION_DATE", config["label"]["maturity_days"], as_of
     )

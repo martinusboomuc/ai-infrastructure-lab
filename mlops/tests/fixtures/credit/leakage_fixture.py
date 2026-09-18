@@ -20,7 +20,7 @@ CONFIG = {
         "validation": {"from": "2020-01-06", "to": "2020-01-08"},
         "test": {"from": "2020-01-09", "to": "2020-01-15"},
     },
-    "label": {"maturity_days": 1},
+    "label": {"maturity_days": 1, "as_of": "2020-01-15"},
 }
 
 
@@ -29,6 +29,19 @@ def raw_tables() -> dict[str, pd.DataFrame]:
         {
             "SK_ID_CURR": [1, 2],
             "TARGET": [0, 1],
+            "CODE_GENDER": ["M", "F"],
+            "DAYS_BIRTH": [-12000, -15000],
+            "DAYS_EMPLOYED": [-2000, 365243],  # id=2 exercises the sentinel
+            "AMT_INCOME_TOTAL": [150000.0, 90000.0],
+            "AMT_CREDIT": [500000.0, 300000.0],
+            "AMT_ANNUITY": [25000.0, 15000.0],
+            "NAME_EDUCATION_TYPE": ["Higher education", "Secondary"],
+            "NAME_FAMILY_STATUS": ["Married", "Single"],
+            "NAME_HOUSING_TYPE": ["House / apartment", "With parents"],
+            "CNT_CHILDREN": [1, 0],
+            "EXT_SOURCE_1": [0.5, None],
+            "EXT_SOURCE_2": [0.6, 0.4],
+            "EXT_SOURCE_3": [0.7, 0.3],
         }
     )
 
