@@ -42,9 +42,10 @@ are additional to those, never a replacement.
 
 Two from that file are restated here because the cost of missing them is high:
 
-**Never run a Git command**, including read-only ones. Every Git operation is run by the
-repository owner in his own terminal. When work is ready to commit, stop, say so, and propose
-a message.
+**Claude never runs a mutating Git command** — `add`, `commit`, `push` and the like. Read-only
+commands (`status`, `log`, `diff`) are fine. Every Git operation that changes state is run by
+the repository owner in his own terminal. When work is ready to commit, stop, say so, and
+propose a message.
 
 **No emoji in any artifact** — documentation, commit messages, code comments, Notion pages or
 status indicators in tables.

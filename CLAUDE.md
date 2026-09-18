@@ -26,13 +26,15 @@ written down is worth more than a claim that papers over it.
 
 ## Git
 
-**Never run a Git command.** Not `add`, `commit`, `push`, `pull`, `fetch`, `merge`, `rebase`,
-`checkout`, `branch`, `stash`, `reset` or `status`, and no `gh` commands. This includes
-read-only commands.
+**Claude never runs a mutating Git command.** Not `add`, `commit`, `push`, `pull`, `fetch`,
+`merge`, `rebase`, `checkout`, `branch` (create or delete), `stash`, or `reset`, and no `gh`
+command of any kind. Every Git operation that changes history, the working tree, a branch, or a
+remote is run by the repository owner, by hand, in his own terminal — that hands-on practice is
+the point, not a limit on what Claude is capable of.
 
-Every Git operation is run by the repository owner, by hand, in his own terminal. When work
-is ready to commit, stop and say so, and propose a commit message. Do not offer to run it.
-To see what changed, read the files directly.
+Read-only Git commands (`status`, `log`, `diff`, `show`, `branch -v` and the like) are fine for
+Claude to run when they are the fastest way to check state. When work is ready to commit, stop
+and say so, and propose a commit message. Do not offer to run it.
 
 ---
 
