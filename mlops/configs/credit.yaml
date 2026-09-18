@@ -41,8 +41,19 @@ split:
 
 # ADR-0004: label maturity window. 540 days (~18 months) sits within ADR-0004's cited
 # 12-24 month range for default risk, and matches ARCHITECTURE.md's own example.
+#
+# as_of is deliberately NOT synthetic_anchor.end. "as_of" means "today, when we're evaluating" —
+# using anchor.end (the last synthetic application date) would mean "today = the moment data
+# collection stopped", which makes the mature cutoff (as_of - maturity_days) land at 2017-01-06,
+# strictly before the validation window even starts (2017-08-01) — every validation and test row
+# would be immature, leaving nothing to evaluate on. Found by actually running Phase 3 Stage 1's
+# training pipeline, not caught by inspection. Real evaluation always happens after data
+# collection stopped, so as_of is modeled as meaningfully later than anchor.end — chosen so the
+# resulting cutoff (2018-04-08) falls inside the test window, giving train/validation entirely
+# mature and test a genuine mature/immature mix, rather than either extreme (0% or 100% mature).
 label:
   maturity_days: 540
+  as_of: 2019-09-30
 
 # Values with a special meaning other than their literal number. 365243 is Home Credit's
 # generic "not applicable" placeholder for a DAYS_* column, not unique to DAYS_EMPLOYED —
@@ -59,3 +70,23 @@ sentinel_values:
     DAYS_LAST_DUE_1ST_VERSION: 365243
     DAYS_LAST_DUE: 365243
     DAYS_TERMINATION: 365243
+
+# ADR-0005: WoE scorecard is champion, LightGBM is challenger for Credit Risk (reversed for
+# Fraud). Config-driven so src/bankml/training/ stays a generic, domain-agnostic mechanism.
+modelling:
+  champion: scorecard
+  challenger: lightgbm
+
+# Phase 3: cost-sensitive evaluation and slice tolerances. Provisional — no real business input
+# exists for a portfolio project; illustrative, not invented precision. Revisit if this project
+# ever needs to reflect a real bank's actual risk appetite.
+evaluation:
+  cost_of_miss: 10 # cost units, missing an actual defaulter
+  cost_of_review: 1 # cost units, reviewing a false positive
+  target_fpr: 0.05
+  alert_budget_fraction: 0.10 # top decile by risk score
+  slices:
+    - column: CODE_GENDER
+      tolerance: 0.05 # max allowed PR-AUC drop on any slice value vs. overall
+    - column: NAME_EDUCATION_TYPE
+      tolerance: 0.05
