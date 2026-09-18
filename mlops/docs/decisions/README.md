@@ -16,6 +16,7 @@ old one; the old one stays, marked as superseded.
 | [0004](0004-temporal-validation.md) | Temporal splits, label maturity, and a CI leakage test | Accepted |
 | [0005](0005-scorecard-champion-gbm-challenger.md) | Logistic scorecard is champion for Credit Risk | Accepted |
 | [0006](0006-defer-feature-store.md) | Defer the feature store | Accepted |
+| [0007](0007-synthetic-fixtures-for-leakage-test.md) | Synthetic fixtures for the CI leakage test | Accepted |
 
 ## Template
 
