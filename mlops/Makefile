@@ -1,4 +1,4 @@
-.PHONY: setup lint test
+.PHONY: setup lint test check-data data
 
 setup:
 	uv sync
@@ -10,3 +10,10 @@ lint:
 
 test:
 	uv run pytest
+
+check-data:
+	@test -n "$(BANKML_DATA_ROOT)" || { echo "BANKML_DATA_ROOT is not set. Copy .env.example to .env."; exit 1; }
+	@test -d "$(BANKML_DATA_ROOT)" || { echo "Data root not found at $(BANKML_DATA_ROOT). Is the drive mounted?"; exit 1; }
+
+data: check-data
+	uv run dvc pull
