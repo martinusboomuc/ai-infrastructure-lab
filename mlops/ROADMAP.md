@@ -29,7 +29,7 @@ checks pass in CI.
 - [x] Initial ADRs
 - [x] Dataset catalogue with licensing caveats
 - [x] Working conventions (`CLAUDE.md`), environment config, local setup guide
-- [ ] Domain config schema drafted for Credit Risk
+- [x] Domain config schema drafted for Credit Risk
 
 **Exit criteria:** a reader can tell, from the repository alone, what is built, what is planned,
 and why each contested technical choice was made.
