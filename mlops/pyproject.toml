@@ -6,11 +6,13 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "dvc[azure]>=3.67.1",
     "lightgbm>=4.7.0",
+    "mlflow>=3.16.1",
     "optbinning>=1.0.0",
     "pandera[pandas]>=0.33.1",
     "pyarrow>=25.0.1",
     "pyyaml>=6.0.3",
     "scikit-learn>=1.9.1",
+    "shap>=0.52.0",
 ]
 
 [build-system]
