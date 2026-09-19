@@ -18,6 +18,7 @@ old one; the old one stays, marked as superseded.
 | [0006](0006-defer-feature-store.md) | Defer the feature store | Accepted |
 | [0007](0007-synthetic-fixtures-for-leakage-test.md) | Synthetic fixtures for the CI leakage test | Accepted |
 | [0008](0008-synthetic-application-date-anchor.md) | Synthetic calendar anchor for Home Credit's relative timestamps | Accepted |
+| [0009](0009-serving-time-feature-construction.md) | Serving-time feature construction from request-supplied historical records | Accepted |
 
 ## Template
 
