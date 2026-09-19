@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and fill in real values. terraform.tfvars is gitignored — it holds
+# an API token and a host-specific storage layout, neither of which belongs in the repository.
+
+proxmox_endpoint  = "https://192.168.1.10:8006"
+proxmox_api_token = "terraform@pve!terraform-token=00000000-0000-0000-0000-000000000000"
+proxmox_node      = "pve"
+
+ssh_public_key = "ssh-ed25519 AAAA... you@yourmachine"
+
+# Run `pvesm status` on the Proxmox host to confirm these names — they are not always "local-lvm"
+# and "local-hdd", those are just common defaults.
+ssd_datastore_id = "local-lvm"
+hdd_datastore_id = "local-hdd"

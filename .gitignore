@@ -20,6 +20,8 @@ venv/
 *.tfstate
 *.tfstate.*
 .terraform/
+*.tfvars
+!*.tfvars.example
 
 # Logs
 *.log

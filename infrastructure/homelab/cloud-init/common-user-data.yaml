@@ -1,0 +1,9 @@
+#cloud-config
+# Runs once on first boot of every VM in this module. Installs the QEMU guest agent so Proxmox
+# (and this module's outputs.tf) can read the VM's real IP address and shut it down cleanly —
+# without it, `agent { enabled = true }` in main.tf has nothing on the guest side to talk to.
+package_update: true
+packages:
+  - qemu-guest-agent
+runcmd:
+  - systemctl enable --now qemu-guest-agent
