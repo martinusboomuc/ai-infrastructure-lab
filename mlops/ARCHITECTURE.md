@@ -56,7 +56,7 @@ skew is designed out rather than monitored for.
                      │ promoted model                    │
                      ▼                                   ▼
   ┌──────────────────────────────────────────────────────────────────────────┐
-  │  Serving — FastAPI on Azure Container Apps (image from ACR)              │
+  │  Serving — FastAPI on Azure Container Apps (image from GHCR)             │
   │  shared feature code · request IDs · prediction log                      │
   └──────────────────┬───────────────────────────────────────────────────────┘
                      │ predictions + inputs
@@ -176,8 +176,9 @@ demonstrate modelling.
 
 ## 6. Serving
 
-FastAPI behind Uvicorn, containerised, deployed to Azure Container Apps from an image in Azure
-Container Registry. Per request:
+FastAPI behind Uvicorn, containerised, deployed to Azure Container Apps from an image in GitHub
+Container Registry (ADR-0010 — Azure Container Registry is blocked outright on the Azure for
+Students subscription this project runs on, independent of region). Per request:
 
 1. Validate the payload against the same Pandera contract used in training.
 2. Build features using the **imported domain feature module** — the same code the training

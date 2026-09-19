@@ -19,6 +19,7 @@ old one; the old one stays, marked as superseded.
 | [0007](0007-synthetic-fixtures-for-leakage-test.md) | Synthetic fixtures for the CI leakage test | Accepted |
 | [0008](0008-synthetic-application-date-anchor.md) | Synthetic calendar anchor for Home Credit's relative timestamps | Accepted |
 | [0009](0009-serving-time-feature-construction.md) | Serving-time feature construction from request-supplied historical records | Accepted |
+| [0010](0010-github-container-registry-instead-of-acr.md) | GitHub Container Registry instead of Azure Container Registry | Accepted |
 
 ## Template
 

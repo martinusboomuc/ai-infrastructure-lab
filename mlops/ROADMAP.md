@@ -75,7 +75,7 @@ deliberately degraded model is demonstrably rejected by it.
 - [x] FastAPI service importing the *same* feature module used in training
 - [x] Request validation against the training Pandera contract
 - [x] Structured logging with request IDs; prediction log persisted
-- [ ] Dockerfile; image published to Azure Container Registry
+- [ ] Dockerfile; image published to GitHub Container Registry (ADR-0010)
 - [ ] Deployed to Azure Container Apps, scale-to-zero, secrets from Key Vault
 - [ ] CI/CD: merge to `main` builds, tests, pushes and deploys
 - [x] Prefect introduced for the end-to-end flow
@@ -88,9 +88,12 @@ Both are met locally: `tests/parity/test_training_serving_parity.py` is green (s
 `uv run uvicorn bankml.serving.app:app` against a real, gate-tested `credit-champion@production`
 model returned a real scored decision with reason codes for both a real applicant with history
 and one with none. Not yet met: the Dockerfile builds locally
-(`docker build -f mlops/Dockerfile .`) but its image has not been pushed to a real Azure
-Container Registry, nothing is deployed to Container Apps, and `mlops-deploy.yml` has not fired
-for real. Those need `infrastructure/cloud/bankml-provision.sh` run by hand against a real Azure
+(`docker build -f mlops/Dockerfile .`) but its image has not been pushed to GitHub Container
+Registry, nothing is deployed to Container Apps, and `mlops-deploy.yml` has not fired for real.
+Provisioning hit a real wall: Azure Container Registry is blocked outright on this project's
+Azure for Students subscription, independent of region — see
+[ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md). Those need
+`infrastructure/cloud/bankml-provision.sh` run by hand against a real Azure
 subscription, plus GitHub repo secrets — written as code this session, not yet executed.
 
 ---

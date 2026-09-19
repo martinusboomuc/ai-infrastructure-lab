@@ -3,9 +3,10 @@
 # criterion: "infrastructure/teardown.sh verified to leave zero billable resources").
 #
 # Run by hand, after `az login`. Deletes the whole resource group in one call — everything
-# provisioning created (ACR, Container Apps environment + app, Key Vault) lives in it, so this
-# is the actual guarantee of "zero billable resources left," not a per-resource checklist that
-# can drift out of sync with what provisioning creates.
+# provisioning created (Container Apps environment + app, Key Vault) lives in it, so this is the
+# actual guarantee of "zero billable resources left," not a per-resource checklist that can
+# drift out of sync with what provisioning creates. The image itself lives in GitHub Container
+# Registry (ADR-0010), outside Azure entirely — nothing to tear down there.
 #
 # Usage: RESOURCE_GROUP=... ./bankml-teardown.sh
 

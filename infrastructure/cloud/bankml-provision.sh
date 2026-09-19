@@ -8,27 +8,31 @@
 # Deliberately plain `az` CLI, not Terraform — ROADMAP.md lists "Terraform for the Azure
 # footprint" under *Later*, reassessed after Phase 6, not required for Phase 4.
 #
+# Image comes from GitHub Container Registry, not Azure Container Registry — ADR-0010: ACR was
+# disallowed outright on this project's Azure for Students subscription, independent of region.
+# `GHCR_IMAGE` must already exist (and be public — see mlops-deploy.yml) before the Container App
+# step below; run this after the first successful push, not before.
+#
 # Idempotent: every `az ... create` below is safe to re-run against the same names — Azure
 # either returns the existing resource unchanged or updates it in place. Everything lands in one
 # resource group so `bankml-teardown.sh` can remove it all with a single, verifiable delete.
 #
-# Usage: RESOURCE_GROUP=... ACR_NAME=... ./bankml-provision.sh
+# Usage: RESOURCE_GROUP=... GHCR_IMAGE=ghcr.io/<owner>/<repo>/bankml-serving ./bankml-provision.sh
 # (or just edit the defaults below for a one-off run)
 
 set -euo pipefail
 
 RESOURCE_GROUP="${RESOURCE_GROUP:-bankml-rg}"
-LOCATION="${LOCATION:-westeurope}"
-ACR_NAME="${ACR_NAME:-bankmlacr}"                     # must be globally unique, alphanumeric only
+LOCATION="${LOCATION:-eastus}"
 CONTAINERAPPS_ENV="${CONTAINERAPPS_ENV:-bankml-env}"
 CONTAINER_APP_NAME="${CONTAINER_APP_NAME:-bankml-credit-serving}"
 KEY_VAULT_NAME="${KEY_VAULT_NAME:-bankml-kv}"          # must be globally unique
-IMAGE_NAME="${IMAGE_NAME:-bankml-serving}"
+GHCR_IMAGE="${GHCR_IMAGE:?Set GHCR_IMAGE, e.g. ghcr.io/<owner>/<repo>/bankml-serving}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 
 echo "== BankML Azure provisioning =="
 echo "Resource group:     $RESOURCE_GROUP ($LOCATION)"
-echo "ACR:                 $ACR_NAME"
+echo "Image:               $GHCR_IMAGE:$IMAGE_TAG"
 echo "Container Apps env:  $CONTAINERAPPS_ENV"
 echo "Container App:       $CONTAINER_APP_NAME"
 echo "Key Vault:            $KEY_VAULT_NAME"
@@ -38,16 +42,6 @@ az account show --output none || { echo "Not logged in. Run 'az login' first." >
 
 echo "-- Resource group --"
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output none
-
-echo "-- Azure Container Registry (Basic SKU) --"
-az acr create \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$ACR_NAME" \
-  --sku Basic \
-  --admin-enabled false \
-  --output none
-
-ACR_LOGIN_SERVER="$(az acr show --name "$ACR_NAME" --query loginServer --output tsv)"
 
 echo "-- Key Vault --"
 az keyvault create \
@@ -75,33 +69,24 @@ az containerapp env create \
   --location "$LOCATION" \
   --output none
 
-echo "-- Container App (image must already be pushed to ACR — see mlops-deploy.yml) --"
+echo "-- Container App (pulling a public GHCR image — no registry credentials needed) --"
 az containerapp create \
   --resource-group "$RESOURCE_GROUP" \
   --name "$CONTAINER_APP_NAME" \
   --environment "$CONTAINERAPPS_ENV" \
-  --image "$ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG" \
-  --registry-server "$ACR_LOGIN_SERVER" \
-  --registry-identity system \
+  --image "$GHCR_IMAGE:$IMAGE_TAG" \
   --target-port 8000 \
   --ingress external \
   --min-replicas 0 \
   --max-replicas 3 \
   --output none
 
-echo "-- Granting the container app's managed identity ACR pull + Key Vault read --"
+echo "-- Granting the container app's managed identity Key Vault read --"
 APP_PRINCIPAL_ID="$(az containerapp identity assign \
   --resource-group "$RESOURCE_GROUP" \
   --name "$CONTAINER_APP_NAME" \
   --system-assigned \
   --query principalId --output tsv)"
-
-ACR_ID="$(az acr show --name "$ACR_NAME" --query id --output tsv)"
-az role assignment create \
-  --assignee "$APP_PRINCIPAL_ID" \
-  --scope "$ACR_ID" \
-  --role AcrPull \
-  --output none
 
 az keyvault set-policy \
   --name "$KEY_VAULT_NAME" \
@@ -111,7 +96,5 @@ az keyvault set-policy \
 
 echo
 echo "== Done =="
-echo "ACR login server: $ACR_LOGIN_SERVER"
-echo "Next: build + push the image (mlops-deploy.yml does this on merge to main), then"
-echo "'az containerapp update' to roll out a new revision, or re-run this script with a new"
-echo "IMAGE_TAG."
+echo "Next: push a new image tag (mlops-deploy.yml does this on merge to main), then"
+echo "'az containerapp update --image $GHCR_IMAGE:<tag>' to roll out a new revision."

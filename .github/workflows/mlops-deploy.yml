@@ -1,16 +1,22 @@
 name: BankML build, push and deploy
 
 # Merge to main touching mlops/ builds the serving image, runs the same lint+test gate as
-# mlops-ci.yml, pushes to ACR, and rolls out a new Container Apps revision (ROADMAP Phase 4).
+# mlops-ci.yml, pushes to GitHub Container Registry, and rolls out a new Container Apps revision
+# (ROADMAP Phase 4).
+#
+# GHCR, not Azure Container Registry — ADR-0010: ACR was disallowed outright on this project's
+# Azure for Students subscription, independent of region. The pushed package must be made public
+# once, by hand, in its GitHub package settings (Change visibility -> Public) — Container Apps
+# then pulls it with no registry credentials at all.
 #
 # Requires repository secrets this workflow does NOT create — added by hand in GitHub repo
 # settings, after infrastructure/cloud/bankml-provision.sh has been run once:
-#   AZURE_CREDENTIALS   — output of `az ad sp create-for-rbac --sdk-auth` scoped to bankml-rg
-#   ACR_NAME             — e.g. bankmlacr (must match bankml-provision.sh's ACR_NAME)
+#   AZURE_CREDENTIALS   — {clientId, clientSecret, subscriptionId, tenantId} for a service
+#                         principal scoped to the resource group (az ad sp create-for-rbac)
 #   RESOURCE_GROUP       — e.g. bankml-rg
 #   CONTAINER_APP_NAME   — e.g. bankml-credit-serving
 # Without them this workflow's deploy job fails at the `azure/login` step — expected until those
-# are added; the build+test job still runs and gates the merge either way.
+# are added; the build+test+push job still runs and gates the merge either way.
 
 on:
   push:
@@ -21,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: mlops-deploy-${{ github.ref }}
@@ -30,7 +37,8 @@ jobs:
   build-test-push:
     runs-on: ubuntu-latest
     outputs:
-      image-tag: ${{ steps.tag.outputs.image_tag }}
+      image: ${{ steps.image.outputs.name }}
+      tag: ${{ steps.tag.outputs.image_tag }}
     defaults:
       run:
         working-directory: mlops
@@ -50,23 +58,30 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Compute image tag
+      - name: Compute image name and tag
         id: tag
         run: echo "image_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
-      - name: Azure login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Compute lowercased image name (GHCR requires it)
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/bankml-serving" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push image to ACR
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
         run: |
-          az acr build \
-            --registry "${{ secrets.ACR_NAME }}" \
-            --image "bankml-serving:${{ steps.tag.outputs.image_tag }}" \
-            --image "bankml-serving:latest" \
-            --file Dockerfile \
+          docker build \
+            -t "${{ steps.image.outputs.name }}:${{ steps.tag.outputs.image_tag }}" \
+            -t "${{ steps.image.outputs.name }}:latest" \
+            -f Dockerfile \
             .
+          docker push "${{ steps.image.outputs.name }}:${{ steps.tag.outputs.image_tag }}"
+          docker push "${{ steps.image.outputs.name }}:latest"
 
   deploy:
     needs: build-test-push
@@ -82,4 +97,4 @@ jobs:
           az containerapp update \
             --name "${{ secrets.CONTAINER_APP_NAME }}" \
             --resource-group "${{ secrets.RESOURCE_GROUP }}" \
-            --image "${{ secrets.ACR_NAME }}.azurecr.io/bankml-serving:${{ needs.build-test-push.outputs.image-tag }}"
+            --image "${{ needs.build-test-push.outputs.image }}:${{ needs.build-test-push.outputs.tag }}"

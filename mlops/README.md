@@ -162,9 +162,9 @@ Chosen for what it teaches per unit of setup cost. Rationale for the contested c
 | Data versioning | DVC (private remote — see dataset licensing) |
 | Data validation | Pandera |
 | Experiment tracking & registry | MLflow (tracking + Model Registry) |
-| Orchestration | Prefect *(Phase 4 — `make` and CI until then)* |
+| Orchestration | Prefect |
 | Serving | FastAPI + Uvicorn, structured logging with request IDs |
-| Containers | Docker, Azure Container Registry |
+| Containers | Docker, GitHub Container Registry (ADR-0010) |
 | CI/CD | GitHub Actions |
 | Monitoring | Evidently, Prometheus, Grafana |
 | Cloud | Azure Container Apps, Azure Blob Storage, Azure Key Vault |
