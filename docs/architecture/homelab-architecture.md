@@ -54,6 +54,13 @@ provisioned:
 | `docker-01` | Plain Docker/Compose host for anything outside the cluster | 4 GB | 2 | 40 GB |
 | `monitoring-01` | Prometheus + Grafana | 2 GB | 1 | 20 GB |
 
+`docker-01` also hosts BankML's self-hosted MLflow tracking server (`mlflow server` + Postgres +
+a Cloudflare Tunnel for scoped reachability from the deployed Azure Container App), artifacts on
+Azure Blob rather than local disk — see
+[mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md](../../mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md).
+Decided, not yet built; its RAM footprint on `docker-01`'s 4 GB budget still needs checking once
+it exists alongside whatever else lands there.
+
 All three on the SSD-backed storage pool for their root disks; bulky, non-latency-sensitive data
 (Prometheus's TSDB, container image cache, ISO images) goes on the HDD-backed pool instead. No
 VLAN segmentation yet — all three sit on the flat LAN described in
@@ -71,8 +78,6 @@ automatically migrated.
 
 Deliberately left open, each to be resolved by its own ADR when that phase is actually reached:
 
-- Where MLflow's tracking server runs
-- Where a model registry runs (if separate from MLflow)
 - Where training compute runs for anything heavier than local CPU training
 - The specific VPN technology and configuration (see
   [network-topology.md](../network/network-topology.md))

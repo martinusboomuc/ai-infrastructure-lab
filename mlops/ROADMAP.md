@@ -96,9 +96,12 @@ turned out to be region-specific after all, like ACR; `spaincentral` works
 superseding [ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md)). A real Container App
 is running there now, but it crash-loops on startup: `MLFLOW_TRACKING_URI=sqlite:///mlflow.db`
 resolves to a path inside the container's own filesystem, not the repository owner's laptop, so
-it opens a fresh, empty registry and correctly reports `credit-champion` not found. **Next
-concrete step:** a real, shared, network-reachable MLflow tracking backend the deployed container
-and local training runs both point at — not yet designed. Once that exists,
+it opens a fresh, empty registry and correctly reports `credit-champion` not found. The design
+for a real, shared, network-reachable MLflow backend is now decided: self-hosted on the homelab's
+`docker-01` (once it exists — see [ADR-0002](../../docs/decisions/0002-proxmox-vm-layout.md)),
+artifacts on Azure Blob, reachability via a scoped tunnel
+([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md)). **Next concrete step:**
+implement that stack. Once it's reachable,
 `infrastructure/cloud/bankml-provision.sh` needs no further changes, and adding
 `AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets makes
 `mlops-deploy.yml`'s deploy job real.
