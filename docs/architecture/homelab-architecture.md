@@ -43,6 +43,22 @@ working, managed headless (no monitor/keyboard/mouse needed once booted).
 | Homelab | Self-hosted infrastructure: Linux VMs, Docker, Kubernetes, Terraform testing, the Prometheus/Grafana monitoring stack, CI/CD experimentation, MLOps services where self-hosting is the more useful thing to learn. |
 | Public cloud (Azure now, AWS later) | Managed services where that's the industry-standard solution — e.g. BankML's DVC remote on Azure Blob Storage. |
 
+## VM layout
+
+See [ADR-0002](../decisions/0002-proxmox-vm-layout.md) for the reasoning. Decided, not yet
+provisioned:
+
+| VM | Role | RAM | vCPU | Disk |
+| --- | --- | --- | --- | --- |
+| `k8s-01` | Single-node k3s (control-plane + worker combined) | 4 GB | 2 | 60 GB |
+| `docker-01` | Plain Docker/Compose host for anything outside the cluster | 4 GB | 2 | 40 GB |
+| `monitoring-01` | Prometheus + Grafana | 2 GB | 1 | 20 GB |
+
+All three on the SSD-backed storage pool for their root disks; bulky, non-latency-sensitive data
+(Prometheus's TSDB, container image cache, ISO images) goes on the HDD-backed pool instead. No
+VLAN segmentation yet — all three sit on the flat LAN described in
+[network-topology.md](../network/network-topology.md).
+
 ## Planned hardware
 
 The current desktop is a placeholder. The long-term plan replaces it with a significantly more
@@ -60,7 +76,6 @@ Deliberately left open, each to be resolved by its own ADR when that phase is ac
 - Where training compute runs for anything heavier than local CPU training
 - The specific VPN technology and configuration (see
   [network-topology.md](../network/network-topology.md))
-- Exact VM layout on Proxmox (how many VMs, what each hosts)
 
 This list should shrink over time as those ADRs get written — if this section is still this long
 a few phases from now, that's worth noticing.

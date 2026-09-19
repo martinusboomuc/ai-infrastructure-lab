@@ -15,6 +15,7 @@ old one; the old one stays, marked as superseded.
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-hybrid-infrastructure.md) | Hybrid infrastructure: homelab for self-hosted services, cloud for managed ones | Accepted |
+| [0002](0002-proxmox-vm-layout.md) | Proxmox VM layout: three VMs split by role | Accepted |
 
 ## Template
 
