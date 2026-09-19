@@ -1,0 +1,19 @@
+# Build context for Dockerfile. Mirrors .gitignore's intent for the image: no data, no local
+# environment, no caches — the image serves only, and reads training data from nowhere.
+.venv/
+data/
+mlruns/
+mlartifacts/
+mlflow.db
+.dvc/
+.git/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+.env
+.env.local
+tests/
+docs/
+*.md
+.DS_Store
