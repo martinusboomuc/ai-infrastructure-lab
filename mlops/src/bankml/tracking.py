@@ -14,8 +14,9 @@ import tempfile
 from pathlib import Path
 
 import mlflow
-import mlflow.lightgbm
-import mlflow.sklearn
+import mlflow.pyfunc
+
+from bankml.registry.pyfunc_model import ProbabilityModel
 
 
 def _git_sha() -> str:
@@ -44,6 +45,7 @@ def log_run(
     reason_codes: list[dict],
     model_card: str,
     mlops_root: Path,
+    categories: dict[str, list] | None = None,
 ) -> str:
     """Log one champion/challenger run to MLflow. Returns the MLflow run ID."""
     with mlflow.start_run(run_name=f"credit-{role}") as run:
@@ -73,9 +75,18 @@ def log_run(
             model_card_path.write_text(model_card)
             mlflow.log_artifact(str(model_card_path))
 
-        if model_type == "lightgbm":
-            mlflow.lightgbm.log_model(model, name="model")
-        elif model_type == "scorecard":
-            mlflow.sklearn.log_model(model.logistic_regression, name="model")
+            if categories is not None:
+                # Serving loads this back (bankml.serving.app) so prepare_features encodes
+                # categoricals with exactly the levels this run was fit on — see
+                # capture_categories's docstring for why an inferred-at-call-time category
+                # dtype breaks for a single-row serving request.
+                categories_path = tmp_path / "categorical_levels.json"
+                categories_path.write_text(json.dumps(categories, indent=2))
+                mlflow.log_artifact(str(categories_path))
+
+        # Logged uniformly for every model type (see pyfunc_model.py's docstring) — this is what
+        # keeps `model.logistic_regression`-only logging from silently dropping the scorecard's
+        # WoE binning step, and lets serving load any role's production model the same way.
+        mlflow.pyfunc.log_model(python_model=ProbabilityModel(model), name="model")
 
         return run.info.run_id
