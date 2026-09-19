@@ -241,7 +241,8 @@ Stated openly, because pretending otherwise is the failure mode this project exi
   The governance artifacts (model cards, reason codes, evaluation gates) simulate their outputs.
 - Fairness slicing uses proxy segments available in the data, not protected attributes, which
   these datasets largely do not contain.
-- Serving is verified locally, not deployed live: this project's Azure subscription (Azure for
-  Students) has a Container Apps environment quota of zero, a hard account-tier limit hit while
-  provisioning for real, not a configuration problem. See
-  [ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md).
+- Serving is deployed but not yet serving real predictions: a Container App runs live on Azure
+  (`spaincentral` — see [ADR-0012](docs/decisions/0012-container-apps-region-specific-not-subscription-wide.md)),
+  but it points at a local SQLite MLflow registry that only exists on the repository owner's
+  laptop, so it crash-loops with "model not found" rather than a real registry lookup failure.
+  A shared, network-reachable MLflow backend is the next concrete piece of work, not yet built.

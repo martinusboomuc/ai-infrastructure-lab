@@ -1,6 +1,6 @@
 # ADR-0011: Defer live Azure deployment — Container Apps blocked on Azure for Students
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0012](0012-container-apps-region-specific-not-subscription-wide.md)
 **Date:** 2026-09-19
 
 ## Context
@@ -23,13 +23,27 @@ restrictions, each confirmed by actually hitting it rather than by reading docum
 4. Azure Container Apps environment creation failed with `MaxNumberOfEnvironmentsInSubExceeded`
    — and `az containerapp env list` across the whole subscription came back empty, confirming
    the allowed count is **zero**, not a stale leftover consuming an existing quota slot.
+5. Re-confirmed twice more after a full teardown and re-provision, including in a second region
+   (`eastus`, then `francecentral` again) — identical error both times. The Azure Portal's own
+   Quotas page (Quotas → My quotas → Azure Container Apps) showed "Managed Environment Count:
+   0 of 1" for every region checked, suggesting headroom — but creation failed identically
+   regardless. The Quotas page is showing a generic, documented default limit, not the actual
+   per-subscription restriction; whatever enforces this sits in the same policy layer as items
+   1–2's `RequestDisallowedByAzure` denials, invisible to the standard quota UI entirely.
+6. Re-confirmed a fifth time through the Azure Portal's own "Create Container app" wizard
+   (Basics → Container → Ingress → Review + create), not the CLI at all — identical
+   `MaxNumberOfEnvironmentsInSubExceeded` at the validation step, same error code and wording.
+   This rules out "CLI automation flagged differently than interactive use" definitively: the
+   restriction is enforced identically by both clients, at the Azure Resource Manager level, not
+   in the CLI's own request shape.
 
-Item 4 is a different kind of blocker than 1–3. Those were all workable around (a different
-registry, a different region, a different RBAC call). A subscription-wide quota of zero for the
-resource type Phase 4's live deployment actually runs on is not something a different region,
-CLI flag, or role assignment fixes — the only paths are a Microsoft-approved quota increase (of
-uncertain likelihood on a free/education-tier subscription) or a different subscription
-entirely.
+Items 4–6 are a different kind of blocker than 1–3. Those were all workable around (a different
+registry, a different region, a different RBAC call). A restriction enforced below the level the
+Quotas UI can even see, reproduced identically across two regions and three independent
+provisioning attempts — two via CLI, one via the Portal's own creation wizard — is not something
+a third region, another retry, or a different client fixes. The only paths left are an actual
+Microsoft support ticket (of uncertain outcome and turnaround on a free/education subscription)
+or a different subscription entirely.
 
 ## Decision
 
@@ -46,10 +60,13 @@ Key Vault (the one piece that did get created) torn down rather than sitting the
 
 ## Alternatives considered
 
-**Request a Microsoft quota increase and wait.** Not rejected outright — genuinely available if
-the repository owner wants to pursue it later — but not pursued now: turnaround and approval
-odds on a free/education subscription are both uncertain, and blocking further project progress
-on a support ticket of unknown outcome isn't a good trade for a portfolio project's own pace.
+**Request a quota increase via the Azure Portal's self-service Quotas page.** Tried: the page
+showed existing headroom ("0 of 1") rather than a request form, and re-provisioning against
+that same apparently-available quota failed identically — so there was nothing to actually
+request an increase to. A genuine Microsoft support ticket remains available if the repository
+owner wants to pursue it later, but isn't pursued now: turnaround and approval odds on a
+free/education subscription are both uncertain, and blocking further project progress on a
+ticket of unknown outcome isn't a good trade for a portfolio project's own pace.
 
 **Switch cloud providers entirely** (a platform with no such quota, e.g. Fly.io, Render,
 Railway). Rejected: this project's stack rationale (ARCHITECTURE.md §8) reasons specifically
@@ -70,9 +87,10 @@ architecture adopted to dodge a limit, contradicting ARCHITECTURE.md's own desig
   exit criterion is otherwise met: `tests/parity/test_training_serving_parity.py` is green and a
   real locally-run FastAPI service returned real scored decisions against the actual
   `credit-champion@production` model.
-- `mlops-deploy.yml`'s `deploy` job will keep failing at `azure/login` (no `AZURE_CREDENTIALS`
-  secret has been added, deliberately, since there is nowhere for it to deploy to yet) —
-  expected, not a bug, until this ADR is revisited.
+- `mlops-deploy.yml`'s `deploy` job is conditioned on `AZURE_CREDENTIALS` existing
+  (`if: secrets.AZURE_CREDENTIALS != ''`) and skips cleanly rather than failing — deliberately,
+  since there is nowhere for it to deploy to yet. The `build-test-push` job (lint, test, build,
+  push to GHCR) still runs and gates every merge regardless.
 - If a different Azure subscription (a work account, a Pay-As-You-Go conversion, an approved
   quota increase) becomes available, `infrastructure/cloud/bankml-provision.sh` needs no changes
   to attempt deployment again — it was never the script that was wrong.

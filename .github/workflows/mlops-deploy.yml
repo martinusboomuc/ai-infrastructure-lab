@@ -9,14 +9,17 @@ name: BankML build, push and deploy
 # once, by hand, in its GitHub package settings (Change visibility -> Public) — Container Apps
 # then pulls it with no registry credentials at all.
 #
-# Requires repository secrets this workflow does NOT create — added by hand in GitHub repo
-# settings, after infrastructure/cloud/bankml-provision.sh has been run once:
+# A real Container App runs in `spaincentral` (ADR-0012) — westeurope, eastus and francecentral
+# are all disallowed for this resource type on this project's Azure for Students subscription,
+# but the restriction is region-specific, not subscription-wide as ADR-0011 first concluded.
+# The deploy job is skipped, not failed, until three repository secrets exist — added by hand in
+# GitHub repo settings once a shared MLflow backend exists for the deployed container to reach
+# (ROADMAP Phase 4's current gap — the running container can't see the local SQLite registry):
 #   AZURE_CREDENTIALS   — {clientId, clientSecret, subscriptionId, tenantId} for a service
 #                         principal scoped to the resource group (az ad sp create-for-rbac)
 #   RESOURCE_GROUP       — e.g. bankml-rg
 #   CONTAINER_APP_NAME   — e.g. bankml-credit-serving
-# Without them this workflow's deploy job fails at the `azure/login` step — expected until those
-# are added; the build+test+push job still runs and gates the merge either way.
+# The build+test+push job always runs and gates the merge regardless.
 
 on:
   push:
@@ -86,6 +89,9 @@ jobs:
   deploy:
     needs: build-test-push
     runs-on: ubuntu-latest
+    # Skips cleanly (not a failure) until AZURE_CREDENTIALS is added — see the note at the top
+    # of this file. Remove this condition once live deployment is no longer deferred.
+    if: ${{ secrets.AZURE_CREDENTIALS != '' }}
     steps:
       - name: Azure login
         uses: azure/login@v2

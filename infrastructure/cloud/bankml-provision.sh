@@ -26,11 +26,12 @@
 set -euo pipefail
 
 RESOURCE_GROUP="${RESOURCE_GROUP:-bankml-rg}"
-# westeurope and eastus are both disallowed outright on this project's Azure for Students
-# subscription (ACR and Key Vault both rejected, via both CLI and Portal) — francecentral is
-# confirmed to work. Region availability on a restricted subscription is account-specific;
-# override if yours differs.
-LOCATION="${LOCATION:-francecentral}"
+# westeurope, eastus and francecentral are all disallowed for a Container Apps environment on
+# this project's Azure for Students subscription (confirmed via both CLI and the Portal's own
+# creation wizard — see ADR-0012) — spaincentral is confirmed to work end-to-end (Key Vault,
+# Container Apps environment, Container App). Region availability on a restricted subscription
+# is account-specific; override if yours differs.
+LOCATION="${LOCATION:-spaincentral}"
 CONTAINERAPPS_ENV="${CONTAINERAPPS_ENV:-bankml-env}"
 CONTAINER_APP_NAME="${CONTAINER_APP_NAME:-bankml-credit-serving}"
 KEY_VAULT_NAME="${KEY_VAULT_NAME:-bankml-kv}"          # must be globally unique

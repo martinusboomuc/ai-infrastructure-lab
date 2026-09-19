@@ -3,7 +3,8 @@
 > Production-inspired MLOps platform for banking machine learning — built one vertical slice at a time.
 
 **Status:** Phase 4 · Serving and deployment (in progress) · Credit Risk scores locally through a
-FastAPI service; nothing is deployed to Azure yet. See [ROADMAP.md](ROADMAP.md).
+FastAPI service and a Container App runs live on Azure; it isn't serving real predictions yet —
+no shared MLflow backend for the deployed container to reach. See [ROADMAP.md](ROADMAP.md).
 
 BankML Platform reproduces how a bank builds, ships, monitors and governs machine learning
 models in production.

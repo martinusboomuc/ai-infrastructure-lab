@@ -76,8 +76,8 @@ deliberately degraded model is demonstrably rejected by it.
 - [x] Request validation against the training Pandera contract
 - [x] Structured logging with request IDs; prediction log persisted
 - [x] Dockerfile; image published to GitHub Container Registry (ADR-0010)
-- [ ] Deployed to Azure Container Apps, scale-to-zero, secrets from Key Vault — **blocked**, see below
-- [ ] CI/CD: merge to `main` builds, tests, pushes and deploys — build+push half only, deploy half blocked
+- [x] Deployed to Azure Container Apps, scale-to-zero — **running**, in `spaincentral` (ADR-0012); secrets from Key Vault not yet wired up (see below)
+- [ ] CI/CD: merge to `main` builds, tests, pushes and deploys — build+push half only; deploy half needs `AZURE_CREDENTIALS` et al.
 - [x] Prefect introduced for the end-to-end flow
 - [ ] `infrastructure/cloud/bankml-teardown.sh` verified to leave zero billable resources
 
@@ -87,15 +87,21 @@ The parity half is met: `tests/parity/test_training_serving_parity.py` is green 
 [ADR-0009](docs/decisions/0009-serving-time-feature-construction.md)), and a locally-run
 `uv run uvicorn bankml.serving.app:app` against a real, gate-tested `credit-champion@production`
 model returned a real scored decision with reason codes for both a real applicant with history
-and one with none. The *live* half is deferred, not just incomplete: provisioning against this
-project's real Azure subscription (Azure for Students) hit Azure Container Registry blocked
-outright ([ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md)), then,
-after working around that, a Container Apps environment quota of **zero** on the same
-subscription — a hard account-tier limit, not a config or region problem
-([ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md)). `infrastructure/cloud/bankml-provision.sh`,
-`bankml-teardown.sh` and `mlops-deploy.yml` are all written, reviewed, and exercised as far as
-this subscription allows; the deploy step waits on either a Microsoft-approved quota increase or
-a different subscription, per ADR-0011.
+and one with none. The live half is deployed but not yet serving real predictions: provisioning
+against this project's real Azure subscription (Azure for Students) hit Azure Container Registry
+blocked outright ([ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md)),
+then what looked like a subscription-wide Container Apps quota of zero across three regions —
+turned out to be region-specific after all, like ACR; `spaincentral` works
+([ADR-0012](docs/decisions/0012-container-apps-region-specific-not-subscription-wide.md),
+superseding [ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md)). A real Container App
+is running there now, but it crash-loops on startup: `MLFLOW_TRACKING_URI=sqlite:///mlflow.db`
+resolves to a path inside the container's own filesystem, not the repository owner's laptop, so
+it opens a fresh, empty registry and correctly reports `credit-champion` not found. **Next
+concrete step:** a real, shared, network-reachable MLflow tracking backend the deployed container
+and local training runs both point at — not yet designed. Once that exists,
+`infrastructure/cloud/bankml-provision.sh` needs no further changes, and adding
+`AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets makes
+`mlops-deploy.yml`'s deploy job real.
 
 ---
 
