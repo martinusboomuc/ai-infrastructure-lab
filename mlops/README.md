@@ -2,7 +2,8 @@
 
 > Production-inspired MLOps platform for banking machine learning — built one vertical slice at a time.
 
-**Status:** Phase 1 · Foundations · Nothing is deployed yet. See [ROADMAP.md](ROADMAP.md).
+**Status:** Phase 4 · Serving and deployment (in progress) · Credit Risk scores locally through a
+FastAPI service; nothing is deployed to Azure yet. See [ROADMAP.md](ROADMAP.md).
 
 BankML Platform reproduces how a bank builds, ships, monitors and governs machine learning
 models in production.
@@ -16,19 +17,18 @@ machinery that keeps a model honest months after deployment.**
 
 ## What exists today
 
-This documentation, and nothing else. That is deliberate: the README is the product spec, and
-the repository gets filled in against it, publicly, in order. The table below is the honest
-state of the build and is updated with every merged change.
+This README is the product spec, and the repository gets filled in against it, publicly, in
+order. The table below is the honest state of the build and is updated with every merged change.
 
 | Component | Status |
 |---|---|
 | Documentation, architecture, ADRs | In progress |
-| Repository scaffolding, tooling, CI | Not started |
-| Data ingestion + schema validation | Not started |
-| Feature pipeline (point-in-time correct) | Not started |
-| Training pipeline + experiment tracking | Not started |
-| Model registry + model cards | Not started |
-| Serving API | Not started |
+| Repository scaffolding, tooling, CI | Done |
+| Data ingestion + schema validation | Done |
+| Feature pipeline (point-in-time correct) | Done |
+| Training pipeline + experiment tracking | Done |
+| Model registry + model cards | Done |
+| Serving API | In progress |
 | Monitoring + drift detection | Not started |
 | Cloud deployment | Not started |
 | Second domain (portability proof) | Not started |

@@ -72,17 +72,26 @@ deliberately degraded model is demonstrably rejected by it.
 
 ## Phase 4 — Serving and deployment (Credit Risk)
 
-- [ ] FastAPI service importing the *same* feature module used in training
-- [ ] Request validation against the training Pandera contract
-- [ ] Structured logging with request IDs; prediction log persisted
+- [x] FastAPI service importing the *same* feature module used in training
+- [x] Request validation against the training Pandera contract
+- [x] Structured logging with request IDs; prediction log persisted
 - [ ] Dockerfile; image published to Azure Container Registry
 - [ ] Deployed to Azure Container Apps, scale-to-zero, secrets from Key Vault
 - [ ] CI/CD: merge to `main` builds, tests, pushes and deploys
-- [ ] Prefect introduced for the end-to-end flow
-- [ ] `infrastructure/teardown.sh` verified to leave zero billable resources
+- [x] Prefect introduced for the end-to-end flow
+- [ ] `infrastructure/cloud/bankml-teardown.sh` verified to leave zero billable resources
 
 **Exit criteria:** a live endpoint returns a scored decision with reason codes and a model
 version, and a training-vs-serving parity test confirms identical features for the same input.
+Both are met locally: `tests/parity/test_training_serving_parity.py` is green (see
+[ADR-0009](docs/decisions/0009-serving-time-feature-construction.md)), and a locally-run
+`uv run uvicorn bankml.serving.app:app` against a real, gate-tested `credit-champion@production`
+model returned a real scored decision with reason codes for both a real applicant with history
+and one with none. Not yet met: the Dockerfile builds locally
+(`docker build -f mlops/Dockerfile .`) but its image has not been pushed to a real Azure
+Container Registry, nothing is deployed to Container Apps, and `mlops-deploy.yml` has not fired
+for real. Those need `infrastructure/cloud/bankml-provision.sh` run by hand against a real Azure
+subscription, plus GitHub repo secrets — written as code this session, not yet executed.
 
 ---
 
