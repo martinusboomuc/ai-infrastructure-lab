@@ -1,4 +1,4 @@
-.PHONY: setup lint test check-data data features
+.PHONY: setup lint test check-data data features train serve flow
 
 setup:
 	uv sync
@@ -20,3 +20,12 @@ data: check-data
 
 features: check-data
 	uv run dvc repro features_$(DOMAIN)
+
+train: check-data
+	uv run python -m bankml.training.pipeline --domain $(DOMAIN)
+
+serve:
+	uv run uvicorn bankml.serving.app:app --host 0.0.0.0 --port 8000
+
+flow: check-data
+	uv run python -m bankml.orchestration.flow

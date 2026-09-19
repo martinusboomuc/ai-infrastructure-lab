@@ -5,14 +5,17 @@ description = "BankML Platform: a production-inspired MLOps platform for banking
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "dvc[azure]>=3.67.1",
+    "fastapi>=0.118.0",
     "lightgbm>=4.7.0",
     "mlflow>=3.16.1",
     "optbinning>=1.0.0",
     "pandera[pandas]>=0.33.1",
+    "prefect>=3.4.24",
     "pyarrow>=25.0.1",
     "pyyaml>=6.0.3",
     "scikit-learn>=1.9.1",
     "shap>=0.52.0",
+    "uvicorn[standard]>=0.38.0",
 ]
 
 [build-system]
@@ -24,6 +27,7 @@ packages = ["src/bankml"]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28",
     "pre-commit>=4.0",
     "pytest>=8.3",
     "ruff>=0.8",
