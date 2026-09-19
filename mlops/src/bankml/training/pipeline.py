@@ -19,34 +19,15 @@ import yaml
 from bankml.evaluation.explain import compute_reason_codes
 from bankml.evaluation.metrics import compute_metrics
 from bankml.evaluation.slices import compute_slice_metrics
+from bankml.features.credit.prepare import capture_categories
+from bankml.features.credit.prepare import feature_columns as _feature_columns
+from bankml.features.credit.prepare import prepare_features as _prepare_features
 from bankml.registry.gate import evaluate_gate
 from bankml.registry.model_card import generate_model_card
 from bankml.registry.promote import promote_to_production
 from bankml.tracking import log_run
 from bankml.training.gbm import fit_lightgbm
 from bankml.training.scorecard import fit_scorecard
-
-# Bookkeeping / identifier columns, and slice-only columns (fair-lending exclusion) — never
-# passed to a model as a training feature.
-NON_FEATURE_COLUMNS = {
-    "SK_ID_CURR",
-    "TARGET",
-    "APPLICATION_DATE",
-    "SPLIT",
-    "IS_MATURE",
-    "CODE_GENDER",
-}
-
-
-def _feature_columns(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.columns if c not in NON_FEATURE_COLUMNS]
-
-
-def _prepare_features(df: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:
-    X = df[feature_columns].copy()
-    for column in X.select_dtypes(include=["object", "str"]).columns:
-        X[column] = X[column].astype("category")
-    return X
 
 
 def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
@@ -61,6 +42,10 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
     categorical_columns = (
         mature[feature_columns].select_dtypes(include=["object", "str"]).columns.tolist()
     )
+    # Captured once from every mature row (not per-split) and reused everywhere `prepare_features`
+    # is called below, so training, evaluation and serving all encode categoricals identically —
+    # see capture_categories's docstring for the bug this fixes.
+    categories = capture_categories(mature, feature_columns)
 
     splits = {
         name: mature[mature["SPLIT"] == name]
@@ -68,7 +53,7 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
         if (mature["SPLIT"] == name).any()
     }
     train_df = splits["train"]
-    X_train = _prepare_features(train_df, feature_columns)
+    X_train = _prepare_features(train_df, feature_columns, categories=categories)
     y_train = train_df["TARGET"]
 
     results: dict = {"models": {}, "metrics": {}, "slice_metrics": {}, "reason_codes": {}}
@@ -87,7 +72,7 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
         results["slice_metrics"][role] = {}
 
         for split_name, split_df in splits.items():
-            X_split = _prepare_features(split_df, feature_columns)
+            X_split = _prepare_features(split_df, feature_columns, categories=categories)
             y_split = split_df["TARGET"]
             y_score = model.predict_proba(X_split)[:, 1]
 
@@ -99,9 +84,10 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
             )
 
         explain_split = splits.get("test", train_df)
-        X_explain = _prepare_features(explain_split, feature_columns)
+        X_explain = _prepare_features(explain_split, feature_columns, categories=categories)
         results["reason_codes"][role] = compute_reason_codes(model, model_type, X_explain)
 
+    results["categories"] = categories
     return results
 
 
@@ -151,6 +137,7 @@ def main(domain: str = "credit") -> None:
             results["reason_codes"][role],
             model_card,
             mlops_root,
+            categories=results["categories"],
         )
         print(f"\nLogged {role} to MLflow run {run_id}")
 

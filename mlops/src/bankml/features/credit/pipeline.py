@@ -63,12 +63,24 @@ def load_raw_tables(config: dict) -> dict[str, pd.DataFrame]:
     return tables
 
 
-def build_features(raw_tables: dict[str, pd.DataFrame], config: dict) -> pd.DataFrame:
-    application_df = raw_tables["application_train"]
-    anchor = config["synthetic_anchor"]
-    application_dates = compute_application_dates(application_df, anchor["start"], anchor["end"])
+def assemble_features(
+    raw_tables: dict[str, pd.DataFrame], application_dates: pd.Series
+) -> pd.DataFrame:
+    """Build the base-applicant-columns-plus-relational-aggregates feature table for whichever
+    applicants appear in `application_dates` (indexed by SK_ID_CURR), as-of each one's own
+    mapped timestamp.
 
-    base = application_df[["SK_ID_CURR", "TARGET", *BASE_APPLICANT_COLUMNS]].copy()
+    The one function both the batch training path (`build_features`, below, using the synthetic
+    per-applicant anchor from ADR-0008) and single-request serving
+    (`bankml.serving.app`, using the actual request time as the decision timestamp) call — this
+    is the concrete mechanism behind ADR-0006's "training and serving import the same module"
+    and ADR-0009's request-time construction. `raw_tables["application_train"]` need not contain
+    every applicant in `application_dates`'s index in the training-set sense; it only needs a
+    row for each SK_ID_CURR being scored. TARGET is intentionally not included here — it is a
+    training-only column, added by `build_features`, never available at serving time.
+    """
+    application_df = raw_tables["application_train"]
+    base = application_df[["SK_ID_CURR", *BASE_APPLICANT_COLUMNS]].copy()
     base["APPLICATION_DATE"] = base["SK_ID_CURR"].map(application_dates)
 
     is_sentinel = base["DAYS_EMPLOYED"] == DAYS_EMPLOYED_SENTINEL
@@ -94,8 +106,28 @@ def build_features(raw_tables: dict[str, pd.DataFrame], config: dict) -> pd.Data
     # application stays NaN — "no data to average" is not the same claim as "average is zero".
     count_cols = [c for c in features.columns if c.endswith("_COUNT")]
     sum_cols = [c for c in features.columns if c.endswith("_SUM")]
+    mean_cols = [c for c in features.columns if c.endswith("_MEAN")]
     features[count_cols] = features[count_cols].fillna(0).astype(int)
-    features[sum_cols] = features[sum_cols].fillna(0.0)
+    features[sum_cols] = features[sum_cols].fillna(0.0).astype(float)
+    # float64, not just left to fillna/pandas inference: an aggregate joined against a *table
+    # with zero rows* (an applicant with no history in it at all — routine for a single-request
+    # serving call, never seen in batch training) comes back `object`-dtyped straight out of the
+    # groupby, not float64 — pandas can't infer a numeric type from an empty aggregation. Left
+    # unfixed, a downstream model rejects the column outright ("pandas dtypes must be int, float
+    # or bool"). Found by actually serving a request with an empty relational table, not by
+    # inspection — see ADR-0009 and `tests/parity/test_training_serving_parity.py`.
+    features[mean_cols] = features[mean_cols].astype(float)
+
+    return features.sort_values("SK_ID_CURR").reset_index(drop=True)
+
+
+def build_features(raw_tables: dict[str, pd.DataFrame], config: dict) -> pd.DataFrame:
+    application_df = raw_tables["application_train"]
+    anchor = config["synthetic_anchor"]
+    application_dates = compute_application_dates(application_df, anchor["start"], anchor["end"])
+
+    features = assemble_features(raw_tables, application_dates)
+    features = features.merge(application_df[["SK_ID_CURR", "TARGET"]], on="SK_ID_CURR")
 
     features["SPLIT"] = chronological_split(features, "APPLICATION_DATE", config["split"])
     as_of = pd.Timestamp(config["label"]["as_of"])
