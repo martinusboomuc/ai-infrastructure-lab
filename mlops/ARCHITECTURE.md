@@ -214,9 +214,10 @@ still pass the evaluation gate.
 | **Pandera** over Great Expectations | Code-first, pytest-native, an order of magnitude less setup. GX is powerful but heavy and its API has churned across major versions. The CV value is identical. [ADR-0003](docs/decisions/0003-pandera-over-great-expectations.md) |
 | **DVC** with a private remote | Home Credit and IEEE-CIS carry competition terms restricting redistribution, so data is versioned by reference, never committed. |
 | **MLflow** for tracking *and* registry | One service, two responsibilities. The registry is not separate technology. |
-| **Prefect deferred to Phase 4** | `make` plus GitHub Actions is sufficient for linear pipelines. Orchestration earns its keep when there are branching, retrying, scheduled flows. |
+| **Prefect** (added Phase 4) | `make` plus GitHub Actions was sufficient through Phase 3's linear pipelines. A thin flow (`src/bankml/orchestration/flow.py`) now wraps the existing feature and training entrypoints as tasks, with no change to either's own behavior. |
 | **Feature store deferred** | Feast without an online store is mostly ceremony. The real skill is point-in-time-correct feature construction, which is built in Phase 2 regardless. [ADR-0006](docs/decisions/0006-defer-feature-store.md) |
 | **Azure Container Apps** over AKS | Serverless containers, scale-to-zero, no cluster to babysit or pay for. Kubernetes is a later exercise, not a starting requirement. |
+| **GitHub Container Registry** over Azure Container Registry | ACR is disallowed outright on this project's Azure for Students subscription. A public GHCR image needs no registry credential at all for Container Apps to pull it, and reuses CI's own `GITHUB_TOKEN`. [ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md) |
 | **`uv`** over pip/Poetry | Fast, lockfile-based, single tool for envs and dependencies. |
 | **`optbinning`** | Mature WoE/scorecard implementation; writing binning from scratch is not the point. |
 
@@ -240,3 +241,7 @@ Stated openly, because pretending otherwise is the failure mode this project exi
   The governance artifacts (model cards, reason codes, evaluation gates) simulate their outputs.
 - Fairness slicing uses proxy segments available in the data, not protected attributes, which
   these datasets largely do not contain.
+- Serving is verified locally, not deployed live: this project's Azure subscription (Azure for
+  Students) has a Container Apps environment quota of zero, a hard account-tier limit hit while
+  provisioning for real, not a configuration problem. See
+  [ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md).

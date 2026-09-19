@@ -13,9 +13,12 @@
 # `GHCR_IMAGE` must already exist (and be public — see mlops-deploy.yml) before the Container App
 # step below; run this after the first successful push, not before.
 #
-# Idempotent: every `az ... create` below is safe to re-run against the same names — Azure
-# either returns the existing resource unchanged or updates it in place. Everything lands in one
-# resource group so `bankml-teardown.sh` can remove it all with a single, verifiable delete.
+# Idempotent, but not via `az ... create`'s own behavior — unlike `az group create`,
+# `az keyvault create`/`az containerapp create` error outright ("already exists") on a second
+# run rather than treating it as a no-op. Every step below checks existence first and skips
+# creation if found, which is what actually makes re-running this safe. Found by re-running it
+# for real, not by reading the docs. Everything lands in one resource group so
+# `bankml-teardown.sh` can remove it all with a single, verifiable delete.
 #
 # Usage: RESOURCE_GROUP=... GHCR_IMAGE=ghcr.io/<owner>/<repo>/bankml-serving ./bankml-provision.sh
 # (or just edit the defaults below for a one-off run)
@@ -23,7 +26,11 @@
 set -euo pipefail
 
 RESOURCE_GROUP="${RESOURCE_GROUP:-bankml-rg}"
-LOCATION="${LOCATION:-eastus}"
+# westeurope and eastus are both disallowed outright on this project's Azure for Students
+# subscription (ACR and Key Vault both rejected, via both CLI and Portal) — francecentral is
+# confirmed to work. Region availability on a restricted subscription is account-specific;
+# override if yours differs.
+LOCATION="${LOCATION:-francecentral}"
 CONTAINERAPPS_ENV="${CONTAINERAPPS_ENV:-bankml-env}"
 CONTAINER_APP_NAME="${CONTAINER_APP_NAME:-bankml-credit-serving}"
 KEY_VAULT_NAME="${KEY_VAULT_NAME:-bankml-kv}"          # must be globally unique
@@ -44,16 +51,23 @@ echo "-- Resource group --"
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output none
 
 echo "-- Key Vault --"
-az keyvault create \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$KEY_VAULT_NAME" \
-  --location "$LOCATION" \
-  --output none
+if az keyvault show --name "$KEY_VAULT_NAME" --output none 2>/dev/null; then
+  echo "   already exists, skipping"
+else
+  az keyvault create \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$KEY_VAULT_NAME" \
+    --location "$LOCATION" \
+    --output none
+fi
 
+# Requires the caller to already hold a data-plane role on the vault (e.g. "Key Vault Secrets
+# Officer") — the RBAC permission model (this vault's, and the Portal's current default) does
+# not grant secret access to the vault's creator/Owner automatically; that surprised us too.
+# `secret set` itself is a genuine upsert, safe to re-run without a existence check.
+#
 # Real runtime secrets go here as this project grows past a local SQLite MLflow store — e.g. a
 # hosted MLFLOW_TRACKING_URI, an Azure Storage connection string for prediction-log persistence.
-# Placeholder so the container app below has at least one secret reference to wire up; replace
-# with real values before first deploy.
 az keyvault secret set \
   --vault-name "$KEY_VAULT_NAME" \
   --name "mlflow-tracking-uri" \
@@ -63,36 +77,63 @@ az keyvault secret set \
 echo "-- Container Apps environment (scale-to-zero by default per app, not the environment) --"
 az extension add --name containerapp --upgrade --output none 2>/dev/null || true
 az provider register --namespace Microsoft.App --wait
-az containerapp env create \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$CONTAINERAPPS_ENV" \
-  --location "$LOCATION" \
-  --output none
+# Microsoft.App auto-creates a Log Analytics workspace for the environment unless one is
+# provided, which needs this provider registered too — not obvious from Microsoft.App's own
+# name, found by actually hitting "Subscription ... is not registered for the
+# Microsoft.OperationalInsights resource provider" on a first-ever run.
+az provider register --namespace Microsoft.OperationalInsights --wait
+if az containerapp env show --resource-group "$RESOURCE_GROUP" --name "$CONTAINERAPPS_ENV" --output none 2>/dev/null; then
+  echo "   already exists, skipping"
+else
+  az containerapp env create \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$CONTAINERAPPS_ENV" \
+    --location "$LOCATION" \
+    --output none
+fi
 
 echo "-- Container App (pulling a public GHCR image — no registry credentials needed) --"
-az containerapp create \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$CONTAINER_APP_NAME" \
-  --environment "$CONTAINERAPPS_ENV" \
-  --image "$GHCR_IMAGE:$IMAGE_TAG" \
-  --target-port 8000 \
-  --ingress external \
-  --min-replicas 0 \
-  --max-replicas 3 \
-  --output none
+if az containerapp show --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP_NAME" --output none 2>/dev/null; then
+  echo "   already exists, skipping (use 'az containerapp update --image ...' to roll out a new tag)"
+else
+  az containerapp create \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$CONTAINER_APP_NAME" \
+    --environment "$CONTAINERAPPS_ENV" \
+    --image "$GHCR_IMAGE:$IMAGE_TAG" \
+    --target-port 8000 \
+    --ingress external \
+    --min-replicas 0 \
+    --max-replicas 3 \
+    --output none
+fi
 
 echo "-- Granting the container app's managed identity Key Vault read --"
+# Idempotent by nature: assigning a system identity that's already assigned just returns its
+# existing principalId.
 APP_PRINCIPAL_ID="$(az containerapp identity assign \
   --resource-group "$RESOURCE_GROUP" \
   --name "$CONTAINER_APP_NAME" \
   --system-assigned \
   --query principalId --output tsv)"
 
-az keyvault set-policy \
-  --name "$KEY_VAULT_NAME" \
-  --object-id "$APP_PRINCIPAL_ID" \
-  --secret-permissions get list \
-  --output none
+# RBAC role assignment, not `az keyvault set-policy` — the vault uses the "Azure role-based
+# access control" permission model, where the older access-policy API has no effect at all.
+KEY_VAULT_ID="$(az keyvault show --name "$KEY_VAULT_NAME" --query id --output tsv)"
+EXISTING_ASSIGNMENT="$(az role assignment list \
+  --assignee "$APP_PRINCIPAL_ID" \
+  --scope "$KEY_VAULT_ID" \
+  --role "Key Vault Secrets User" \
+  --query "[0].id" --output tsv)"
+if [ -n "$EXISTING_ASSIGNMENT" ]; then
+  echo "   role assignment already exists, skipping"
+else
+  az role assignment create \
+    --assignee "$APP_PRINCIPAL_ID" \
+    --role "Key Vault Secrets User" \
+    --scope "$KEY_VAULT_ID" \
+    --output none
+fi
 
 echo
 echo "== Done =="

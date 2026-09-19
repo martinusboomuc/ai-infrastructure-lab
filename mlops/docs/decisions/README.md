@@ -20,6 +20,7 @@ old one; the old one stays, marked as superseded.
 | [0008](0008-synthetic-application-date-anchor.md) | Synthetic calendar anchor for Home Credit's relative timestamps | Accepted |
 | [0009](0009-serving-time-feature-construction.md) | Serving-time feature construction from request-supplied historical records | Accepted |
 | [0010](0010-github-container-registry-instead-of-acr.md) | GitHub Container Registry instead of Azure Container Registry | Accepted |
+| [0011](0011-defer-live-azure-deployment.md) | Defer live Azure deployment — Container Apps blocked on Azure for Students | Accepted |
 
 ## Template
 

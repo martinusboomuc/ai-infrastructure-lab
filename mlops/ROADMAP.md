@@ -75,26 +75,27 @@ deliberately degraded model is demonstrably rejected by it.
 - [x] FastAPI service importing the *same* feature module used in training
 - [x] Request validation against the training Pandera contract
 - [x] Structured logging with request IDs; prediction log persisted
-- [ ] Dockerfile; image published to GitHub Container Registry (ADR-0010)
-- [ ] Deployed to Azure Container Apps, scale-to-zero, secrets from Key Vault
-- [ ] CI/CD: merge to `main` builds, tests, pushes and deploys
+- [x] Dockerfile; image published to GitHub Container Registry (ADR-0010)
+- [ ] Deployed to Azure Container Apps, scale-to-zero, secrets from Key Vault — **blocked**, see below
+- [ ] CI/CD: merge to `main` builds, tests, pushes and deploys — build+push half only, deploy half blocked
 - [x] Prefect introduced for the end-to-end flow
 - [ ] `infrastructure/cloud/bankml-teardown.sh` verified to leave zero billable resources
 
 **Exit criteria:** a live endpoint returns a scored decision with reason codes and a model
 version, and a training-vs-serving parity test confirms identical features for the same input.
-Both are met locally: `tests/parity/test_training_serving_parity.py` is green (see
+The parity half is met: `tests/parity/test_training_serving_parity.py` is green (see
 [ADR-0009](docs/decisions/0009-serving-time-feature-construction.md)), and a locally-run
 `uv run uvicorn bankml.serving.app:app` against a real, gate-tested `credit-champion@production`
 model returned a real scored decision with reason codes for both a real applicant with history
-and one with none. Not yet met: the Dockerfile builds locally
-(`docker build -f mlops/Dockerfile .`) but its image has not been pushed to GitHub Container
-Registry, nothing is deployed to Container Apps, and `mlops-deploy.yml` has not fired for real.
-Provisioning hit a real wall: Azure Container Registry is blocked outright on this project's
-Azure for Students subscription, independent of region — see
-[ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md). Those need
-`infrastructure/cloud/bankml-provision.sh` run by hand against a real Azure
-subscription, plus GitHub repo secrets — written as code this session, not yet executed.
+and one with none. The *live* half is deferred, not just incomplete: provisioning against this
+project's real Azure subscription (Azure for Students) hit Azure Container Registry blocked
+outright ([ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md)), then,
+after working around that, a Container Apps environment quota of **zero** on the same
+subscription — a hard account-tier limit, not a config or region problem
+([ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md)). `infrastructure/cloud/bankml-provision.sh`,
+`bankml-teardown.sh` and `mlops-deploy.yml` are all written, reviewed, and exercised as far as
+this subscription allows; the deploy step waits on either a Microsoft-approved quota increase or
+a different subscription, per ADR-0011.
 
 ---
 
