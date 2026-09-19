@@ -33,6 +33,11 @@ models/
 reports/
 monitoring/reports/
 
+# Serving's prediction log (Phase 4) — local runtime data, never committed. Read by Phase 5's
+# drift job; the log's location is configurable via BANKML_PREDICTION_LOG_DIR, but this default
+# path stays ignored regardless of where a given deployment actually points it.
+data/predictions/
+
 # Environment
 .env
 .env.local
