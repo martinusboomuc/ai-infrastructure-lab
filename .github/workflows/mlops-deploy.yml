@@ -1,0 +1,85 @@
+name: BankML build, push and deploy
+
+# Merge to main touching mlops/ builds the serving image, runs the same lint+test gate as
+# mlops-ci.yml, pushes to ACR, and rolls out a new Container Apps revision (ROADMAP Phase 4).
+#
+# Requires repository secrets this workflow does NOT create — added by hand in GitHub repo
+# settings, after infrastructure/cloud/bankml-provision.sh has been run once:
+#   AZURE_CREDENTIALS   — output of `az ad sp create-for-rbac --sdk-auth` scoped to bankml-rg
+#   ACR_NAME             — e.g. bankmlacr (must match bankml-provision.sh's ACR_NAME)
+#   RESOURCE_GROUP       — e.g. bankml-rg
+#   CONTAINER_APP_NAME   — e.g. bankml-credit-serving
+# Without them this workflow's deploy job fails at the `azure/login` step — expected until those
+# are added; the build+test job still runs and gates the merge either way.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mlops/**'
+      - '.github/workflows/mlops-deploy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mlops-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.tag.outputs.image_tag }}
+    defaults:
+      run:
+        working-directory: mlops
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: '0.9.25'
+
+      - name: Install dependencies from the locked environment
+        run: uv sync --locked
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Compute image tag
+        id: tag
+        run: echo "image_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and push image to ACR
+        run: |
+          az acr build \
+            --registry "${{ secrets.ACR_NAME }}" \
+            --image "bankml-serving:${{ steps.tag.outputs.image_tag }}" \
+            --image "bankml-serving:latest" \
+            --file Dockerfile \
+            .
+
+  deploy:
+    needs: build-test-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy new revision to Container Apps
+        run: |
+          az containerapp update \
+            --name "${{ secrets.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ secrets.RESOURCE_GROUP }}" \
+            --image "${{ secrets.ACR_NAME }}.azurecr.io/bankml-serving:${{ needs.build-test-push.outputs.image-tag }}"
