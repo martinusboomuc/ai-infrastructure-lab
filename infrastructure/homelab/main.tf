@@ -75,7 +75,10 @@ resource "proxmox_virtual_environment_vm" "this" {
 
   cpu {
     cores = each.value.cpu_cores
-    type  = "host"
+    # "host" passes through the exact physical CPU's feature flags, which caused an early guest
+    # kernel panic ("Attempted to kill init!") on this hardware — kvm64 is QEMU's maximally
+    # compatible baseline, at some performance cost, and resolves it.
+    type = "kvm64"
   }
 
   memory {
@@ -114,8 +117,11 @@ resource "proxmox_virtual_environment_vm" "this" {
   }
 
   initialization {
-    datastore_id      = var.ssd_datastore_id
-    user_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data.id
+    datastore_id = var.ssd_datastore_id
+    # vendor-data layers additively on top of Proxmox's own generated user-data (hostname,
+    # ciuser, sshkeys below) — user_data_file_id would replace that generated content outright,
+    # which is what silently dropped hostname/user provisioning the first time this was built.
+    vendor_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data.id
 
     ip_config {
       ipv4 {

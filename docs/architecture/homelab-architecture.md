@@ -25,6 +25,22 @@ here — [ADR-0001](../decisions/0001-hybrid-infrastructure.md)'s Consequences).
 **Proxmox VE.** Installed and operational: networking configured, internet connectivity
 working, managed headless (no monitor/keyboard/mouse needed once booted).
 
+**Required boot parameter.** This CPU hits a reproducible guest kernel panic under KVM
+(`Attempted to kill init!`, seconds into boot) without `processor.max_cstate=1
+intel_idle.max_cstate=0` on the host's kernel command line — consumer desktop boards' CPU
+power-management (deep C-states) isn't validated for the constant VM-exit/VM-entry cycling KVM
+does, unlike server-grade hardware. Confirmed the crash disappears entirely under pure software
+emulation (`--kvm 0`, no CPU passthrough involved) and is unrelated to guest CPU type (`host` and
+`kvm64` both crashed identically) or disk corruption (same disk, no crash without KVM) — isolating
+it to KVM's interaction with this host's idle states. Set via `/etc/default/grub`'s
+`GRUB_CMDLINE_LINUX_DEFAULT`, applied to **both** `/boot/grub/grub.cfg` and
+`/boot/efi/EFI/proxmox/grub.cfg` (this is a UEFI install with two separate grub.cfg files —
+`update-grub` alone only regenerates the first; the actual EFI boot needs
+`grub-mkconfig -o /boot/efi/EFI/proxmox/grub.cfg` run explicitly too). The mitigation reduces the
+crash's probability rather than eliminating it outright — an occasional VM still needs one
+`qm stop`/`qm start` retry after a fresh boot. If this host is ever reinstalled, redo this before
+concluding VMs are broken.
+
 ## Remote management
 
 - **Wake-on-LAN** is configured and working — the machine can be powered on remotely from the
@@ -45,8 +61,9 @@ working, managed headless (no monitor/keyboard/mouse needed once booted).
 
 ## VM layout
 
-See [ADR-0002](../decisions/0002-proxmox-vm-layout.md) for the reasoning. Decided, not yet
-provisioned:
+See [ADR-0002](../decisions/0002-proxmox-vm-layout.md) for the reasoning. Provisioned via
+Terraform (`infrastructure/homelab/`) and reachable over SSH as the `ops` user, DHCP-assigned
+addresses on the flat LAN:
 
 | VM | Role | RAM | vCPU | Disk |
 | --- | --- | --- | --- | --- |

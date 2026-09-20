@@ -27,12 +27,17 @@ None of these are things Terraform can do for you — they're one-time setup on 
 1. **An API token**, not the root password. Datacenter > Permissions > API Tokens. Give it a
    role that can manage VMs (`PVEVMAdmin` or similar) rather than reusing an administrator
    token meant for something else.
-2. **A storage pool that allows Snippets content**, for the cloud-init user-data file this module
-   uploads. Not on by default even for `local` — Datacenter > Storage > (your storage) > Edit >
-   Content, tick "Snippets".
+2. **A storage pool that allows Snippets content**, for the cloud-init vendor-data file this
+   module uploads. Not on by default even for `local` — Datacenter > Storage > (your storage) >
+   Edit > Content, tick "Snippets".
 3. **Confirm your actual storage IDs** with `pvesm status` on the host. `terraform.tfvars.example`
    assumes `local-lvm` (SSD) and `local-hdd` (HDD); override if yours differ.
 4. **Confirm the node name** with `pvesh get /nodes` if it isn't the default `pve`.
+5. **On this specific hardware, a host kernel boot parameter is required** for VMs to boot under
+   KVM at all — see `docs/architecture/homelab-architecture.md`'s Hypervisor section. Without it,
+   every VM this module creates kernel-panics seconds into boot. If this Terraform is ever run
+   against a different or reinstalled host, check whether the same CPU-family issue applies before
+   assuming a fresh crash means something's wrong with the Terraform itself.
 
 ## Usage
 
@@ -42,12 +47,20 @@ cp terraform.tfvars.example terraform.tfvars
 
 terraform init
 terraform plan
-terraform apply
+terraform apply -parallelism=1
 ```
+
+**Use `-parallelism=1` on `apply`.** All three VMs import their disk from the same source image
+onto the same storage; Proxmox holds an exclusive lock during that import, so creating them
+concurrently (Terraform's default) causes the later ones to time out waiting for the lock and
+fail with a corrupted disk configuration. Sequential creation avoids this entirely, at the cost
+of a slower apply (roughly 15 minutes per VM on this hardware).
 
 `vm_ipv4_addresses` in the output is empty immediately after apply — the guest agent needs the
 VM to finish booting and cloud-init to install it first. Run `terraform refresh` a minute or two
-later, or check the Proxmox web UI.
+later, or check the Proxmox web UI. If a VM's console shows a kernel panic instead of a login
+prompt, see the boot-parameter prerequisite above — `qm stop`/`qm start` on that one VM is
+usually enough to get a clean boot on retry.
 
 ## Tearing down
 
