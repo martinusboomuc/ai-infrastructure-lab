@@ -15,8 +15,10 @@ not on his behalf.
 - Does not configure VLAN segmentation — `docs/network/network-topology.md` leaves that open;
   all three VMs land on one flat bridge.
 - Does not install Kubernetes, Docker, Prometheus/Grafana or MLflow *inside* the VMs. This module
-  stops at a booted VM reachable over SSH with the guest agent running. Provisioning what runs on
-  top is separate work (Ansible, or a follow-up module), not yet written.
+  stops at a booted VM reachable over SSH with the guest agent running. `k8s-01` has k3s installed
+  by hand (see below) — Docker on `docker-01` and Prometheus/Grafana on `monitoring-01` are still
+  not provisioned. Whether the remaining two ever move to Ansible or a follow-up module is an open
+  question, not a decision made here.
 - Does not manage DNS, TLS, or the Cloudflare Tunnel ADR-0013 calls for on `docker-01` — that's
   configuration inside the VM, not a Proxmox-level resource.
 
@@ -61,6 +63,34 @@ VM to finish booting and cloud-init to install it first. Run `terraform refresh`
 later, or check the Proxmox web UI. If a VM's console shows a kernel panic instead of a login
 prompt, see the boot-parameter prerequisite above — `qm stop`/`qm start` on that one VM is
 usually enough to get a clean boot on retry.
+
+## k3s on k8s-01
+
+Installed by hand over SSH, not by Terraform:
+
+```bash
+ssh -i ~/.ssh/id_ed25519_ai_lab ops@<k8s-01's IP>
+curl -sfL https://get.k3s.io | sh -
+```
+
+The default install is a single-node cluster (control-plane and worker combined, per
+[ADR-0002](../../docs/decisions/0002-proxmox-vm-layout.md)) with k3s's bundled components:
+Traefik ingress, `local-path-provisioner` for storage, CoreDNS, `metrics-server`. No extra install
+flags needed for this layout.
+
+To run `kubectl` from the MacBook instead of SSHing in every time:
+
+```bash
+mkdir -p ~/.kube
+ssh -i ~/.ssh/id_ed25519_ai_lab ops@<k8s-01's IP> "sudo cat /etc/rancher/k3s/k3s.yaml" > ~/.kube/config
+sed -i '' 's/127.0.0.1/<k8s-01's IP>/' ~/.kube/config
+chmod 600 ~/.kube/config
+kubectl get nodes
+```
+
+k3s's default kubeconfig points at `127.0.0.1` because it's written to be used from the node
+itself — the `sed` rewrite is what makes it usable remotely. The file contains a client
+certificate; `chmod 600` and treat it like any other credential, not something to commit.
 
 ## Tearing down
 

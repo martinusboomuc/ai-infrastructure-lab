@@ -65,11 +65,21 @@ See [ADR-0002](../decisions/0002-proxmox-vm-layout.md) for the reasoning. Provis
 Terraform (`infrastructure/homelab/`) and reachable over SSH as the `ops` user, DHCP-assigned
 addresses on the flat LAN:
 
-| VM | Role | RAM | vCPU | Disk |
-| --- | --- | --- | --- | --- |
-| `k8s-01` | Single-node k3s (control-plane + worker combined) | 4 GB | 2 | 60 GB |
-| `docker-01` | Plain Docker/Compose host for anything outside the cluster | 4 GB | 2 | 40 GB |
-| `monitoring-01` | Prometheus + Grafana | 2 GB | 1 | 20 GB |
+| VM | Role | RAM | vCPU | Disk | Address (DHCP, may change) |
+| --- | --- | --- | --- | --- | --- |
+| `k8s-01` | Single-node k3s (control-plane + worker combined) | 4 GB | 2 | 60 GB | 192.168.1.183 |
+| `docker-01` | Plain Docker/Compose host for anything outside the cluster | 4 GB | 2 | 40 GB | 192.168.1.115 |
+| `monitoring-01` | Prometheus + Grafana | 2 GB | 1 | 20 GB | 192.168.1.136 |
+
+These addresses are DHCP leases, not static reservations — `network-topology.md`'s "What's not
+decided yet" already flags IP addressing as an open item. If a lease changes, re-check with
+`qm agent <vmid> network-get-interfaces` on the Proxmox host rather than assuming these are
+stale; a router-side DHCP reservation per VM's MAC address would make this table permanently
+accurate, but that's a decision for `network-topology.md`, not made here.
+
+**`k8s-01` is running k3s** (installed via the upstream install script, not yet via Terraform or
+Ansible — see `infrastructure/homelab/README.md` for the exact command and how `kubectl` from
+the MacBook is wired up against it).
 
 `docker-01` also hosts BankML's self-hosted MLflow tracking server (`mlflow server` + Postgres +
 a Cloudflare Tunnel for scoped reachability from the deployed Azure Container App), artifacts on
