@@ -92,6 +92,13 @@ k3s's default kubeconfig points at `127.0.0.1` because it's written to be used f
 itself — the `sed` rewrite is what makes it usable remotely. The file contains a client
 certificate; `chmod 600` and treat it like any other credential, not something to commit.
 
+## MLflow on docker-01
+
+See [`mlflow/README.md`](mlflow/README.md) — a Docker Compose stack for BankML's self-hosted
+MLflow tracking server ([ADR-0013](../../mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md)),
+currently an interim build (local artifact storage, no external tunnel yet), not the full decided
+design.
+
 ## Tearing down
 
 ```bash
