@@ -15,10 +15,10 @@ not on his behalf.
 - Does not configure VLAN segmentation — `docs/network/network-topology.md` leaves that open;
   all three VMs land on one flat bridge.
 - Does not install Kubernetes, Docker, Prometheus/Grafana or MLflow *inside* the VMs. This module
-  stops at a booted VM reachable over SSH with the guest agent running. `k8s-01` has k3s installed
-  by hand (see below) — Docker on `docker-01` and Prometheus/Grafana on `monitoring-01` are still
-  not provisioned. Whether the remaining two ever move to Ansible or a follow-up module is an open
-  question, not a decision made here.
+  stops at a booted VM reachable over SSH with the guest agent running. `k8s-01` has k3s, `docker-01`
+  has Docker and MLflow, and `monitoring-01` has Docker, Prometheus and Grafana — all installed by
+  hand over SSH (see below), not by this module. Whether any of this moves to Ansible or a
+  follow-up module is an open question, not a decision made here.
 - Does not manage DNS, TLS, or the Cloudflare Tunnel ADR-0013 calls for on `docker-01` — that's
   configuration inside the VM, not a Proxmox-level resource.
 
@@ -96,8 +96,15 @@ certificate; `chmod 600` and treat it like any other credential, not something t
 
 See [`mlflow/README.md`](mlflow/README.md) — a Docker Compose stack for BankML's self-hosted
 MLflow tracking server ([ADR-0013](../../mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md)),
-currently an interim build (local artifact storage, no external tunnel yet), not the full decided
-design.
+reachable through a Cloudflare Tunnel gated by Access. Artifact storage is still a local Docker
+volume, not Azure Blob as that ADR decided.
+
+## Prometheus and Grafana on monitoring-01
+
+See [`monitoring/README.md`](monitoring/README.md) — a Docker Compose stack for Prometheus and
+Grafana, scraping `node_exporter` (installed as a systemd service, not a container) on all three
+VMs. Host-level metrics only so far; per-container, per-pod and BankML application metrics are
+still open.
 
 ## Tearing down
 

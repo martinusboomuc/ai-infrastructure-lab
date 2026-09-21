@@ -94,10 +94,16 @@ a Cloudflare Tunnel gated by Cloudflare Access) — see
 [mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md](../../mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md)
 and [infrastructure/homelab/mlflow/README.md](../../infrastructure/homelab/mlflow/README.md).
 Live and verified reachable at `https://mlflow.homelab-boom.com` (403 without an Access Service
-Token, 200 with one). Artifacts still live on a local Docker volume, not Azure Blob as ADR-0013
-decided, and the deployed Azure Container App doesn't yet send the Access credentials on its own
-requests — both open. `docker-01`'s RAM footprint with this stack running still needs checking
-once more lands on the same VM.
+Token, 200 with one), and the deployed Azure Container App authenticates through it correctly on
+every request via `src/bankml/tracking_auth.py`'s MLflow request header provider. Artifacts still
+live on a local Docker volume, not Azure Blob as ADR-0013 decided.
+
+`monitoring-01` runs Prometheus and Grafana — see
+[infrastructure/homelab/monitoring/README.md](../../infrastructure/homelab/monitoring/README.md).
+`node_exporter` runs as a systemd service (not a container, since `k8s-01` runs containerd rather
+than Docker) on all three VMs; Prometheus scrapes all three and Grafana renders a provisioned
+"Homelab Overview" dashboard (CPU, memory, disk, network, up/down) per host. Host-level metrics
+only so far — per-container, per-pod and BankML application metrics are still open.
 
 All three on the SSD-backed storage pool for their root disks; bulky, non-latency-sensitive data
 (Prometheus's TSDB, container image cache, ISO images) goes on the HDD-backed pool instead. No
