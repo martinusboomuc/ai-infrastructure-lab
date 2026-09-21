@@ -41,6 +41,14 @@ crash's probability rather than eliminating it outright — an occasional VM sti
 `qm stop`/`qm start` retry after a fresh boot. If this host is ever reinstalled, redo this before
 concluding VMs are broken.
 
+**Guest CPU type is `host`, not `kvm64`.** `kvm64` was tried as part of diagnosing the panic
+above and turned out not to matter (both crashed identically) — the boot parameter was the real
+fix. `kvm64` was left in place afterward anyway and later broke NumPy on `docker-01`
+(`RuntimeError: NumPy was built with baseline optimizations: (X86_V2) but your machine doesn't
+support: (X86_V2)`), since it's QEMU's most conservative CPU model and doesn't expose the
+instruction set modern prebuilt Python wheels assume. All three VMs now use `host` — full feature
+passthrough, safe now that the actual cause is fixed at the host level.
+
 ## Remote management
 
 - **Wake-on-LAN** is configured and working — the machine can be powered on remotely from the

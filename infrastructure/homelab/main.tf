@@ -75,10 +75,15 @@ resource "proxmox_virtual_environment_vm" "this" {
 
   cpu {
     cores = each.value.cpu_cores
-    # "host" passes through the exact physical CPU's feature flags, which caused an early guest
-    # kernel panic ("Attempted to kill init!") on this hardware — kvm64 is QEMU's maximally
-    # compatible baseline, at some performance cost, and resolves it.
-    type = "kvm64"
+    # An early guest kernel panic ("Attempted to kill init!") on this hardware was first thought
+    # to be a CPU-type issue and "fixed" by switching to kvm64 — but the panic happened
+    # identically under kvm64 and host alike, and the real cause turned out to be the Proxmox
+    # host's CPU power management (see docs/architecture/homelab-architecture.md, Hypervisor
+    # section, for the actual fix: a host kernel boot parameter). kvm64's minimal instruction set
+    # then broke NumPy ("NumPy was built with baseline optimizations: (X86_V2)") the first time a
+    # real Python workload (self-hosted MLflow) ran on one of these VMs. "host" is correct once
+    # that host-level fix is in place — do not revert to kvm64 without re-reading that section.
+    type = "host"
   }
 
   memory {
