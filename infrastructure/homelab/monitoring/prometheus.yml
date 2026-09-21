@@ -26,3 +26,13 @@ scrape_configs:
       - targets: ["192.168.1.136:9100"]
         labels:
           role: monitoring-01
+
+  # The deployed BankML serving app itself, over the public internet — its /metrics endpoint has
+  # no authentication of its own (same exposure the app's existing /health and /predict/credit
+  # endpoints already have; see infrastructure/homelab/monitoring/README.md's "What's still open").
+  - job_name: bankml-credit-serving
+    scheme: https
+    static_configs:
+      - targets: ["bankml-credit-serving.delightfulgrass-66b6c9e3.spaincentral.azurecontainerapps.io"]
+        labels:
+          role: bankml-credit-serving
