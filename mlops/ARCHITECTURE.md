@@ -188,7 +188,10 @@ Students subscription this project runs on, independent of region). Per request:
    store, for later drift analysis and delayed-label evaluation.
 
 Every response carries the model version and the request ID. Secrets come from Azure Key Vault;
-nothing is baked into the image.
+nothing is baked into the image. A `GET /metrics` endpoint (`src/bankml/serving/metrics.py`)
+exposes Prometheus-format request counts, request latency and prediction counts by decision — a
+single domain-agnostic middleware handles the HTTP-level metrics for every route, so a new domain
+gets them for free.
 
 ---
 

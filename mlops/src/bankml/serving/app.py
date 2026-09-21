@@ -22,12 +22,14 @@ import mlflow.pyfunc
 import pandas as pd
 import pandera.errors
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
 from mlflow import MlflowClient
 from pydantic import BaseModel, Field
 
 from bankml.evaluation.explain import compute_reason_codes
 from bankml.features.credit.pipeline import assemble_features
 from bankml.features.credit.prepare import feature_columns, prepare_features
+from bankml.serving.metrics import PREDICTIONS, metrics_middleware, render_metrics
 from bankml.serving.prediction_log import write_prediction_record
 from bankml.validation.credit.bureau import BureauSchema
 from bankml.validation.credit.bureau_balance import BureauBalanceSchema
@@ -135,6 +137,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="BankML Credit Risk Serving", lifespan=lifespan)
+app.middleware("http")(metrics_middleware)
 
 
 def _validate_history_table(name: str, rows: list[dict[str, Any]], schema: type) -> pd.DataFrame:
@@ -164,6 +167,11 @@ def _build_raw_tables(payload: CreditPredictionRequest) -> dict[str, pd.DataFram
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "model_version": state.model_version}
+
+
+@app.get("/metrics")
+def metrics() -> Response:
+    return render_metrics()
 
 
 @app.post("/predict/credit")
@@ -196,6 +204,7 @@ def predict_credit(payload: CreditPredictionRequest) -> dict:
         "timestamp": datetime.now(UTC).isoformat(),
     }
     write_prediction_record(record, domain=DOMAIN)
+    PREDICTIONS.labels(domain=DOMAIN, decision=decision).inc()
     _log_event(
         "prediction",
         request_id=request_id,

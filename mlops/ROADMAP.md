@@ -127,7 +127,15 @@ out a new revision is done by hand via `infrastructure/cloud/bankml-provision.sh
 
 ## Phase 5 — Monitoring and retraining (Credit Risk)
 
-- [ ] Prometheus metrics exposed; Grafana dashboard for latency, throughput, errors
+- [x] Prometheus metrics exposed (`GET /metrics`, `src/bankml/serving/metrics.py`); Grafana
+      dashboard for latency, throughput and errors, scraping the live Azure endpoint from
+      Prometheus on the homelab's `monitoring-01`
+      ([infrastructure/homelab/monitoring/README.md](../infrastructure/homelab/monitoring/README.md)).
+      Request count (by path, method and status code), request latency and predictions (by
+      domain and decision) all confirmed working against a real local run with a real registered
+      model. The Azure scrape target itself will read `down` until the deployed image is rebuilt
+      and redeployed with this code — Prometheus can't scrape an endpoint that doesn't exist yet
+      on the currently-running revision.
 - [ ] Evidently jobs: input drift, prediction drift, per-feature PSI
 - [ ] Drift alerting with configured thresholds
 - [ ] Delayed-label performance job that runs once labels mature
