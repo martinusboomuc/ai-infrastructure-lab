@@ -20,8 +20,16 @@
 # for real, not by reading the docs. Everything lands in one resource group so
 # `bankml-teardown.sh` can remove it all with a single, verifiable delete.
 #
-# Usage: RESOURCE_GROUP=... GHCR_IMAGE=ghcr.io/<owner>/<repo>/bankml-serving ./bankml-provision.sh
+# Usage: RESOURCE_GROUP=... GHCR_IMAGE=ghcr.io/<owner>/<repo>/bankml-serving \
+#   MLFLOW_TRACKING_URI=https://mlflow.homelab-boom.com \
+#   CF_ACCESS_CLIENT_ID=... CF_ACCESS_CLIENT_SECRET=... ./bankml-provision.sh
 # (or just edit the defaults below for a one-off run)
+#
+# The last three wire the app to BankML's self-hosted MLflow tracking server, reached through a
+# Cloudflare Tunnel gated by Access (mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md)
+# — CF_ACCESS_CLIENT_ID/SECRET are the "bankml-container-app" Service Token's credentials, read
+# automatically by src/bankml/tracking_auth.py's MLflow request header provider. Required every
+# run, same as GHCR_IMAGE — there's no safe default for a credential.
 
 set -euo pipefail
 
@@ -37,6 +45,8 @@ CONTAINER_APP_NAME="${CONTAINER_APP_NAME:-bankml-credit-serving}"
 KEY_VAULT_NAME="${KEY_VAULT_NAME:-bankml-kv}"          # must be globally unique
 GHCR_IMAGE="${GHCR_IMAGE:?Set GHCR_IMAGE, e.g. ghcr.io/<owner>/<repo>/bankml-serving}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID:?Set CF_ACCESS_CLIENT_ID (the bankml-container-app Service Token's Client ID)}"
+CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET:?Set CF_ACCESS_CLIENT_SECRET (the bankml-container-app Service Token's Client Secret)}"
 
 echo "== BankML Azure provisioning =="
 echo "Resource group:     $RESOURCE_GROUP ($LOCATION)"
@@ -67,12 +77,27 @@ fi
 # not grant secret access to the vault's creator/Owner automatically; that surprised us too.
 # `secret set` itself is a genuine upsert, safe to re-run without a existence check.
 #
-# Real runtime secrets go here as this project grows past a local SQLite MLflow store — e.g. a
-# hosted MLFLOW_TRACKING_URI, an Azure Storage connection string for prediction-log persistence.
+# The self-hosted MLflow tracking server's URL and the Cloudflare Access Service Token that
+# authenticates the app's requests to it through the Tunnel (ADR-0013). Defaults to the local
+# SQLite path if MLFLOW_TRACKING_URI isn't set, which is what originally caused the deployed
+# container to crash-loop — this default only makes sense for a from-scratch first run, not once
+# the real value below is in use.
 az keyvault secret set \
   --vault-name "$KEY_VAULT_NAME" \
   --name "mlflow-tracking-uri" \
   --value "${MLFLOW_TRACKING_URI:-sqlite:///mlflow.db}" \
+  --output none
+
+az keyvault secret set \
+  --vault-name "$KEY_VAULT_NAME" \
+  --name "cf-access-client-id" \
+  --value "$CF_ACCESS_CLIENT_ID" \
+  --output none
+
+az keyvault secret set \
+  --vault-name "$KEY_VAULT_NAME" \
+  --name "cf-access-client-secret" \
+  --value "$CF_ACCESS_CLIENT_SECRET" \
   --output none
 
 echo "-- Container Apps environment (scale-to-zero by default per app, not the environment) --"
@@ -136,7 +161,37 @@ else
     --output none
 fi
 
+echo "-- Wiring the Key Vault secrets into the container app's environment --"
+# keyvaultref + identityref:system: the app's own managed identity (granted read access just
+# above) resolves these at revision-start time, not at CLI-call time — the RBAC role above
+# doesn't need to have already propagated for this `secret set` call to succeed, only for the
+# app to actually start cleanly afterward.
+az containerapp secret set \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$CONTAINER_APP_NAME" \
+  --secrets \
+    "mlflow-tracking-uri=keyvaultref:https://$KEY_VAULT_NAME.vault.azure.net/secrets/mlflow-tracking-uri,identityref:system" \
+    "cf-access-client-id=keyvaultref:https://$KEY_VAULT_NAME.vault.azure.net/secrets/cf-access-client-id,identityref:system" \
+    "cf-access-client-secret=keyvaultref:https://$KEY_VAULT_NAME.vault.azure.net/secrets/cf-access-client-secret,identityref:system" \
+  --output none
+
+# --set-env-vars replaces the container's entire env var list, not just these three — harmless
+# today since the app was created with none at all, but if anything else is ever added via the
+# Portal directly instead of here, a future run of this script will silently drop it. Add it
+# here, not in the Portal, if that ever happens.
+az containerapp update \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$CONTAINER_APP_NAME" \
+  --set-env-vars \
+    MLFLOW_TRACKING_URI=secretref:mlflow-tracking-uri \
+    CF_ACCESS_CLIENT_ID=secretref:cf-access-client-id \
+    CF_ACCESS_CLIENT_SECRET=secretref:cf-access-client-secret \
+  --output none
+
 echo
 echo "== Done =="
+echo "This update itself rolled out a new revision (env vars changed) — check whether it's"
+echo "actually serving now:"
+echo "  az containerapp logs show --resource-group $RESOURCE_GROUP --name $CONTAINER_APP_NAME --tail 30"
 echo "Next: push a new image tag (mlops-deploy.yml does this on merge to main), then"
 echo "'az containerapp update --image $GHCR_IMAGE:<tag>' to roll out a new revision."
