@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # node_exporter runs as a systemd service directly on each VM (not in Docker), installed by
+  # hand per infrastructure/homelab/monitoring/README.md, one job per host so Grafana can filter
+  # and label by instance role instead of a single generic "node" job.
+  - job_name: node-k8s-01
+    static_configs:
+      - targets: ["192.168.1.183:9100"]
+        labels:
+          role: k8s-01
+
+  - job_name: node-docker-01
+    static_configs:
+      - targets: ["192.168.1.115:9100"]
+        labels:
+          role: docker-01
+
+  - job_name: node-monitoring-01
+    static_configs:
+      - targets: ["192.168.1.136:9100"]
+        labels:
+          role: monitoring-01
