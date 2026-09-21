@@ -8,6 +8,12 @@
 
 FROM python:3.12-slim AS base
 
+# LightGBM's compiled extension links against libgomp (GNU OpenMP) at import time — absent from
+# the slim base image, and invisible until a real LightGBM model is actually loaded, not just
+# imported at build time (nothing in the build or test steps loads a trained model).
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir uv
 
 WORKDIR /app
