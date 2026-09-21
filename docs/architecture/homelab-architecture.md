@@ -90,11 +90,14 @@ Ansible — see `infrastructure/homelab/README.md` for the exact command and how
 the MacBook is wired up against it).
 
 `docker-01` also hosts BankML's self-hosted MLflow tracking server (`mlflow server` + Postgres +
-a Cloudflare Tunnel for scoped reachability from the deployed Azure Container App), artifacts on
-Azure Blob rather than local disk — see
-[mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md](../../mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md).
-Decided, not yet built; its RAM footprint on `docker-01`'s 4 GB budget still needs checking once
-it exists alongside whatever else lands there.
+a Cloudflare Tunnel gated by Cloudflare Access) — see
+[mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md](../../mlops/docs/decisions/0013-self-hosted-mlflow-on-homelab.md)
+and [infrastructure/homelab/mlflow/README.md](../../infrastructure/homelab/mlflow/README.md).
+Live and verified reachable at `https://mlflow.homelab-boom.com` (403 without an Access Service
+Token, 200 with one). Artifacts still live on a local Docker volume, not Azure Blob as ADR-0013
+decided, and the deployed Azure Container App doesn't yet send the Access credentials on its own
+requests — both open. `docker-01`'s RAM footprint with this stack running still needs checking
+once more lands on the same VM.
 
 All three on the SSD-backed storage pool for their root disks; bulky, non-latency-sensitive data
 (Prometheus's TSDB, container image cache, ISO images) goes on the HDD-backed pool instead. No
