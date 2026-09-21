@@ -9,15 +9,10 @@ Docker Compose stack for BankML's MLflow tracking server, per
 The full reachability chain is live and verified working end-to-end, including real production
 traffic: the deployed Azure Container App reaches this server through the Cloudflare Tunnel,
 authenticates via Access using the `bankml-container-app` Service Token (sent automatically by
-`src/bankml/tracking_auth.py`'s MLflow request header provider), and gets a real response from
-MLflow's own API — confirmed by the error changing from a Cloudflare `403` to MLflow's own
-`RESOURCE_DOES_NOT_EXIST: Registered Model with name=credit-champion not found`.
-
-That remaining error is expected, not a bug: this tracking server is brand new and empty. Every
-model BankML has ever trained and promoted was registered against the old local SQLite store on
-the laptop, never against this one. Getting the deployed app actually serving predictions needs
-training (or at least registration/promotion) re-run with `MLFLOW_TRACKING_URI` pointed here —
-see mlops' own ROADMAP for that as a BankML pipeline task, not homelab infrastructure.
+`src/bankml/tracking_auth.py`'s MLflow request header provider), and loads a real
+`credit-champion@production` model registered and promoted against it. `GET /health` and
+`POST /predict/credit` on the live Azure endpoint both return genuine responses — a real score,
+decision, threshold and SHAP-derived reason codes — see mlops' own ROADMAP.md, Phase 4.
 
 Also still open: artifact storage is a **local Docker volume**, not Azure Blob as ADR-0013
 decided.
@@ -100,5 +95,3 @@ logged run and model, not just stops the containers.
 ## What's still open
 
 - Artifact storage on Azure Blob instead of the local `mlflow-artifacts` volume.
-- A real `credit-champion` model actually registered and promoted against this server — see
-  "Current state" above. This is a BankML training-pipeline task, not homelab infrastructure.

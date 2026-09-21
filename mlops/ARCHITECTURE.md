@@ -241,11 +241,11 @@ Stated openly, because pretending otherwise is the failure mode this project exi
   The governance artifacts (model cards, reason codes, evaluation gates) simulate their outputs.
 - Fairness slicing uses proxy segments available in the data, not protected attributes, which
   these datasets largely do not contain.
-- Serving is deployed but not yet serving real predictions: a Container App runs live on Azure
-  (`spaincentral` — see [ADR-0012](docs/decisions/0012-container-apps-region-specific-not-subscription-wide.md)),
-  and now correctly reaches a real, shared, self-hosted MLflow tracking server through a
-  Cloudflare Tunnel gated by Access ([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md))
-  instead of a laptop-only SQLite file — but that server is brand new and has never had a model
-  registered against it, so startup still fails, now with a genuine `RESOURCE_DOES_NOT_EXIST`
-  rather than a connectivity error. Re-running training (or registration/promotion) against it is
-  the next concrete piece of work.
+- Serving is deployed and genuinely serving real predictions: a Container App runs live on Azure
+  (`spaincentral` — see [ADR-0012](docs/decisions/0012-container-apps-region-specific-not-subscription-wide.md))
+  and reaches a real, shared, self-hosted MLflow tracking server through a Cloudflare Tunnel
+  gated by Access ([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md)) instead of a
+  laptop-only SQLite file. A `credit-champion` model is registered and promoted against that
+  server, and the live endpoint returns real scored decisions with SHAP reason codes and a model
+  version. Artifact storage still lives on a local Docker volume on `docker-01`, not Azure Blob as
+  ADR-0013 decided.

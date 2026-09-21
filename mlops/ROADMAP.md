@@ -79,41 +79,47 @@ deliberately degraded model is demonstrably rejected by it.
 - [x] Deployed to Azure Container Apps, scale-to-zero — **running**, in `spaincentral` (ADR-0012); Key Vault secrets wired up, self-hosted MLflow reachable through the Cloudflare Tunnel (ADR-0013)
 - [x] CI/CD build+push half working (`mlops-deploy.yml`'s job-level `if:` referencing `secrets` directly was silently rejecting every run for a full day — fixed); deploy half still needs `AZURE_CREDENTIALS` et al. as GitHub secrets
 - [x] Prefect introduced for the end-to-end flow
+- [x] Live endpoint serves real scored decisions with reason codes and a model version
 - [ ] `infrastructure/cloud/bankml-teardown.sh` verified to leave zero billable resources
 
 **Exit criteria:** a live endpoint returns a scored decision with reason codes and a model
 version, and a training-vs-serving parity test confirms identical features for the same input.
-The parity half is met: `tests/parity/test_training_serving_parity.py` is green (see
-[ADR-0009](docs/decisions/0009-serving-time-feature-construction.md)), and a locally-run
-`uv run uvicorn bankml.serving.app:app` against a real, gate-tested `credit-champion@production`
-model returned a real scored decision with reason codes for both a real applicant with history
-and one with none. The live half is deployed but not yet serving real predictions: provisioning
-against this project's real Azure subscription (Azure for Students) hit Azure Container Registry
-blocked outright ([ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md)),
-then what looked like a subscription-wide Container Apps quota of zero across three regions —
-turned out to be region-specific after all, like ACR; `spaincentral` works
+**Both halves are now met.** The parity half: `tests/parity/test_training_serving_parity.py` is
+green (see [ADR-0009](docs/decisions/0009-serving-time-feature-construction.md)), and a
+locally-run `uv run uvicorn bankml.serving.app:app` against a real, gate-tested
+`credit-champion@production` model returned a real scored decision with reason codes for both a
+real applicant with history and one with none. The live half: provisioning against this
+project's real Azure subscription (Azure for Students) hit Azure Container Registry blocked
+outright ([ADR-0010](docs/decisions/0010-github-container-registry-instead-of-acr.md)), then
+what looked like a subscription-wide Container Apps quota of zero across three regions — turned
+out to be region-specific after all, like ACR; `spaincentral` works
 ([ADR-0012](docs/decisions/0012-container-apps-region-specific-not-subscription-wide.md),
-superseding [ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md)). A real Container App
-is running there now — it originally crash-looped because `MLFLOW_TRACKING_URI=sqlite:///mlflow.db`
-resolved to a path inside the container's own filesystem, not the repository owner's laptop, so
-it opened a fresh, empty registry and correctly reported `credit-champion` not found. That's
-resolved: a self-hosted MLflow tracking server now runs on the homelab's `docker-01`
+superseding [ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md)). The Container App
+running there originally crash-looped because `MLFLOW_TRACKING_URI=sqlite:///mlflow.db` resolved
+to a path inside the container's own filesystem, not the repository owner's laptop, so it opened
+a fresh, empty registry and correctly reported `credit-champion` not found. That's resolved: a
+self-hosted MLflow tracking server now runs on the homelab's `docker-01`
 ([ADR-0002](../../docs/decisions/0002-proxmox-vm-layout.md)), reachable through a Cloudflare
 Tunnel gated by Access ([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md)), and
-the deployed Container App's requests now authenticate through it correctly
+the deployed Container App's requests authenticate through it correctly
 (`src/bankml/tracking_auth.py`'s MLflow request header provider, wired via Key Vault secrets in
-`infrastructure/cloud/bankml-provision.sh`). Confirmed by the startup error itself changing from
-a Cloudflare `403` to MLflow's own `RESOURCE_DOES_NOT_EXIST: Registered Model with
-name=credit-champion not found` — a real response from the right server, not a connectivity
-failure. **Next concrete step:** that error is expected, not a bug — this tracking server is
-brand new and has never had a model registered against it (Session 005's `credit-champion` only
-ever existed in the old local SQLite store). Re-run training, or at minimum registration and
-promotion, with `MLFLOW_TRACKING_URI=https://mlflow.homelab-boom.com` so a real model lands here,
-then the deployed endpoint should actually serve predictions. Separately, artifacts still live on
-a local Docker volume on `docker-01`, not Azure Blob as ADR-0013 decided.
+`infrastructure/cloud/bankml-provision.sh`). A `credit-champion` model is registered and promoted
+against that server, and the last blocker — `OSError: libgomp.so.1: cannot open shared object
+file`, LightGBM's compiled extension needing a system library absent from the `python:3.12-slim`
+base image, invisible until a real model was actually loaded rather than just imported — is
+fixed by installing `libgomp1` in the Dockerfile. The deployed endpoint now returns genuine
+scored decisions:
 
-Adding `AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets would make
-`mlops-deploy.yml`'s deploy job real (currently skips cleanly without them); until then, rolling
+```json
+{"request_id":"2aa70773-3dd7-4297-8c0b-a68969a586b3","model_version":"1",
+ "score":0.03648135154305376,"decision":"pass","threshold":0.178139549605622,
+ "reason_codes":[{"feature":"EXT_SOURCE_3","shap_value":-0.34710569936954694}, ...]}
+```
+
+Remaining open items, none of which block the exit criteria: artifacts still live on a local
+Docker volume on `docker-01`, not Azure Blob as ADR-0013 decided; and adding
+`AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets would make
+`mlops-deploy.yml`'s deploy job real (currently skips cleanly without them) — until then, rolling
 out a new revision is done by hand via `infrastructure/cloud/bankml-provision.sh` or a direct
 `az containerapp update --image ...`.
 
