@@ -76,8 +76,8 @@ deliberately degraded model is demonstrably rejected by it.
 - [x] Request validation against the training Pandera contract
 - [x] Structured logging with request IDs; prediction log persisted
 - [x] Dockerfile; image published to GitHub Container Registry (ADR-0010)
-- [x] Deployed to Azure Container Apps, scale-to-zero — **running**, in `spaincentral` (ADR-0012); secrets from Key Vault not yet wired up (see below)
-- [ ] CI/CD: merge to `main` builds, tests, pushes and deploys — build+push half only; deploy half needs `AZURE_CREDENTIALS` et al.
+- [x] Deployed to Azure Container Apps, scale-to-zero — **running**, in `spaincentral` (ADR-0012); Key Vault secrets wired up, self-hosted MLflow reachable through the Cloudflare Tunnel (ADR-0013)
+- [x] CI/CD build+push half working (`mlops-deploy.yml`'s job-level `if:` referencing `secrets` directly was silently rejecting every run for a full day — fixed); deploy half still needs `AZURE_CREDENTIALS` et al. as GitHub secrets
 - [x] Prefect introduced for the end-to-end flow
 - [ ] `infrastructure/cloud/bankml-teardown.sh` verified to leave zero billable resources
 
@@ -94,17 +94,28 @@ then what looked like a subscription-wide Container Apps quota of zero across th
 turned out to be region-specific after all, like ACR; `spaincentral` works
 ([ADR-0012](docs/decisions/0012-container-apps-region-specific-not-subscription-wide.md),
 superseding [ADR-0011](docs/decisions/0011-defer-live-azure-deployment.md)). A real Container App
-is running there now, but it crash-loops on startup: `MLFLOW_TRACKING_URI=sqlite:///mlflow.db`
-resolves to a path inside the container's own filesystem, not the repository owner's laptop, so
-it opens a fresh, empty registry and correctly reports `credit-champion` not found. The design
-for a real, shared, network-reachable MLflow backend is now decided: self-hosted on the homelab's
-`docker-01` (once it exists — see [ADR-0002](../../docs/decisions/0002-proxmox-vm-layout.md)),
-artifacts on Azure Blob, reachability via a scoped tunnel
-([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md)). **Next concrete step:**
-implement that stack. Once it's reachable,
-`infrastructure/cloud/bankml-provision.sh` needs no further changes, and adding
-`AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets makes
-`mlops-deploy.yml`'s deploy job real.
+is running there now — it originally crash-looped because `MLFLOW_TRACKING_URI=sqlite:///mlflow.db`
+resolved to a path inside the container's own filesystem, not the repository owner's laptop, so
+it opened a fresh, empty registry and correctly reported `credit-champion` not found. That's
+resolved: a self-hosted MLflow tracking server now runs on the homelab's `docker-01`
+([ADR-0002](../../docs/decisions/0002-proxmox-vm-layout.md)), reachable through a Cloudflare
+Tunnel gated by Access ([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md)), and
+the deployed Container App's requests now authenticate through it correctly
+(`src/bankml/tracking_auth.py`'s MLflow request header provider, wired via Key Vault secrets in
+`infrastructure/cloud/bankml-provision.sh`). Confirmed by the startup error itself changing from
+a Cloudflare `403` to MLflow's own `RESOURCE_DOES_NOT_EXIST: Registered Model with
+name=credit-champion not found` — a real response from the right server, not a connectivity
+failure. **Next concrete step:** that error is expected, not a bug — this tracking server is
+brand new and has never had a model registered against it (Session 005's `credit-champion` only
+ever existed in the old local SQLite store). Re-run training, or at minimum registration and
+promotion, with `MLFLOW_TRACKING_URI=https://mlflow.homelab-boom.com` so a real model lands here,
+then the deployed endpoint should actually serve predictions. Separately, artifacts still live on
+a local Docker volume on `docker-01`, not Azure Blob as ADR-0013 decided.
+
+Adding `AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets would make
+`mlops-deploy.yml`'s deploy job real (currently skips cleanly without them); until then, rolling
+out a new revision is done by hand via `infrastructure/cloud/bankml-provision.sh` or a direct
+`az containerapp update --image ...`.
 
 ---
 

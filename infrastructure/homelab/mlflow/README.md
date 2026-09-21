@@ -6,11 +6,21 @@ Docker Compose stack for BankML's MLflow tracking server, per
 
 ## Current state
 
-The tracking server, Postgres backend, and the Cloudflare Tunnel + Access gate are all live and
-verified working — `https://mlflow.homelab-boom.com` returns `403` with no credentials and `200`
-with a valid Service Token. What's still open: artifact storage is a **local Docker volume**, not
-Azure Blob (ADR-0013's decided design), and the deployed Azure Container App does not yet send
-the Access credentials on its MLflow client requests — see "What's still open" below.
+The full reachability chain is live and verified working end-to-end, including real production
+traffic: the deployed Azure Container App reaches this server through the Cloudflare Tunnel,
+authenticates via Access using the `bankml-container-app` Service Token (sent automatically by
+`src/bankml/tracking_auth.py`'s MLflow request header provider), and gets a real response from
+MLflow's own API — confirmed by the error changing from a Cloudflare `403` to MLflow's own
+`RESOURCE_DOES_NOT_EXIST: Registered Model with name=credit-champion not found`.
+
+That remaining error is expected, not a bug: this tracking server is brand new and empty. Every
+model BankML has ever trained and promoted was registered against the old local SQLite store on
+the laptop, never against this one. Getting the deployed app actually serving predictions needs
+training (or at least registration/promotion) re-run with `MLFLOW_TRACKING_URI` pointed here —
+see mlops' own ROADMAP for that as a BankML pipeline task, not homelab infrastructure.
+
+Also still open: artifact storage is a **local Docker volume**, not Azure Blob as ADR-0013
+decided.
 
 ## Deploying
 
@@ -41,19 +51,18 @@ export MLFLOW_TRACKING_URI=http://<docker-01's IP>:5000
 ```
 
 From outside the LAN — the path the deployed Azure Container App needs — go through the tunnel
-instead, and send the Access Service Token on every request as headers:
+instead:
 
-```
-CF-Access-Client-Id: <client ID, from the bankml-container-app Service Token>
-CF-Access-Client-Secret: <client secret>
+```bash
+export MLFLOW_TRACKING_URI=https://mlflow.homelab-boom.com
+export CF_ACCESS_CLIENT_ID=<client ID, from the bankml-container-app Service Token>
+export CF_ACCESS_CLIENT_SECRET=<client secret>
 ```
 
-`MLFLOW_TRACKING_URI=https://mlflow.homelab-boom.com` alone is not enough — MLflow's Python
-client has no built-in way to attach arbitrary headers to its own requests, so this needs a
-small `RequestHeaderProvider` plugin (an MLflow extension point) installed alongside `mlflow` in
-the serving image, registered to inject those two headers on every call. That plugin does not
-exist yet — writing and wiring it in is BankML application code, not homelab infrastructure, and
-belongs with the rest of Phase 4's serving work.
+No manual header code needed — `bankml`'s `tracking_auth.py` registers an MLflow
+`RequestHeaderProvider` (an MLflow extension point) that reads those two env vars and attaches
+them to every request automatically, and is a complete no-op when they aren't set. Verified
+working both ways: LAN-direct with no env vars, and through the tunnel with them set.
 
 ## Cloudflare Tunnel setup notes (why the config looks the way it does)
 
@@ -91,7 +100,5 @@ logged run and model, not just stops the containers.
 ## What's still open
 
 - Artifact storage on Azure Blob instead of the local `mlflow-artifacts` volume.
-- A `RequestHeaderProvider` plugin so MLflow's Python client sends the Access Service Token
-  headers automatically — see "Using it from BankML" above.
-- Adding `MLFLOW_TRACKING_URI` and the Service Token credentials to the deployed Azure Container
-  App's configuration, and confirming it actually loads `credit-champion@production` on startup.
+- A real `credit-champion` model actually registered and promoted against this server — see
+  "Current state" above. This is a BankML training-pipeline task, not homelab infrastructure.

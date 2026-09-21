@@ -243,6 +243,9 @@ Stated openly, because pretending otherwise is the failure mode this project exi
   these datasets largely do not contain.
 - Serving is deployed but not yet serving real predictions: a Container App runs live on Azure
   (`spaincentral` — see [ADR-0012](docs/decisions/0012-container-apps-region-specific-not-subscription-wide.md)),
-  but it points at a local SQLite MLflow registry that only exists on the repository owner's
-  laptop, so it crash-loops with "model not found" rather than a real registry lookup failure.
-  A shared, network-reachable MLflow backend is the next concrete piece of work, not yet built.
+  and now correctly reaches a real, shared, self-hosted MLflow tracking server through a
+  Cloudflare Tunnel gated by Access ([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md))
+  instead of a laptop-only SQLite file — but that server is brand new and has never had a model
+  registered against it, so startup still fails, now with a genuine `RESOURCE_DOES_NOT_EXIST`
+  rather than a connectivity error. Re-running training (or registration/promotion) against it is
+  the next concrete piece of work.
