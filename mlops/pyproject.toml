@@ -18,6 +18,10 @@ dependencies = [
     "uvicorn[standard]>=0.38.0",
 ]
 
+[project.entry-points."mlflow.request_header_provider"]
+# See src/bankml/tracking_auth.py's docstring for why this exists.
+cloudflare_access = "bankml.tracking_auth:CloudflareAccessRequestHeaderProvider"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
