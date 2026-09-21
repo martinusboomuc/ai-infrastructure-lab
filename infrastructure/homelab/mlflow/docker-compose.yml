@@ -26,12 +26,16 @@ services:
       # Interim artifact store — a local Docker volume, not Azure Blob. ADR-0013 decided
       # artifacts belong on Azure Blob specifically so they don't become the sole copy on this
       # host's disk; this volume is a deliberate placeholder until that's wired up, not the
-      # final design.
+      # final design. Accessed only through the server's own proxy (--default-artifact-root
+      # mlflow-artifacts:/ below) — a remote client (a laptop, the deployed Container App) has no
+      # way to reach this path directly, only MLflow's own HTTP API can.
       - mlflow-artifacts:/mlflow/artifacts
     command: >
       mlflow server
       --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      --default-artifact-root /mlflow/artifacts
+      --default-artifact-root mlflow-artifacts:/
+      --artifacts-destination /mlflow/artifacts
+      --serve-artifacts
       --host 0.0.0.0
       --port 5000
     healthcheck:
