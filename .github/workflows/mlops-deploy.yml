@@ -86,20 +86,30 @@ jobs:
           docker push "${{ steps.image.outputs.name }}:${{ steps.tag.outputs.image_tag }}"
           docker push "${{ steps.image.outputs.name }}:latest"
 
-  deploy:
-    needs: build-test-push
+  check-azure-credentials:
     runs-on: ubuntu-latest
-    # `secrets` cannot be referenced directly in a job-level `if:` — GitHub Actions rejects the
-    # entire workflow file at parse time ("Unrecognized named-value: 'secrets'"), before any job
-    # runs at all. Bridging through `env:` first works because `env` (unlike `secrets`) is a
-    # context `if:` is allowed to read. Found by every run silently instant-failing with 0
-    # billable seconds and no jobs ever created, not by a lint error — nothing caught this until
-    # it broke every build for a full day.
-    env:
-      HAS_AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS != '' }}
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      # A job-level `if:` can only read the github/needs/vars/inputs contexts — not `secrets`,
+      # and not `env` either (that was tried first and also silently rejected the whole workflow
+      # file). Secrets ARE accessible inside a step's own `run:`, so the check has to happen
+      # here and be exposed as a job output, which `needs.<job>.outputs.x` in a later job's
+      # `if:` is allowed to read.
+      - id: check
+        run: |
+          if [ -n "${{ secrets.AZURE_CREDENTIALS }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: [build-test-push, check-azure-credentials]
+    runs-on: ubuntu-latest
     # Skips cleanly (not a failure) until AZURE_CREDENTIALS is added — see the note at the top
     # of this file. Remove this condition once live deployment is no longer deferred.
-    if: ${{ env.HAS_AZURE_CREDENTIALS == 'true' }}
+    if: ${{ needs.check-azure-credentials.outputs.configured == 'true' }}
     steps:
       - name: Azure login
         uses: azure/login@v2
