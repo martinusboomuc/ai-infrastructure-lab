@@ -14,12 +14,17 @@ full topology. Sections marked TBD are genuinely undecided, not omitted by accid
   exposed to the public internet — matches the "management interfaces never exposed directly"
   principle exactly). SSH to the MacBook now works from anywhere via its Tailscale address, not
   only from the home LAN.
-- The Proxmox host and the three VMs (`k8s-01`, `docker-01`, `monitoring-01`) are **not** on the
-  tailnet themselves — still LAN-only. This isn't a gap in practice: the MacBook is reachable
-  from anywhere via Tailscale *and* still sits on the home LAN whenever it's physically there, so
-  it acts as the bridge — SSH to the Mac over Tailscale, then SSH from the Mac's own shell to any
-  VM exactly as before. Putting the VMs on the tailnet directly is possible later if reaching
-  them without the Mac in the loop ever becomes necessary; not needed for anything today.
+- The three VMs (`k8s-01`, `docker-01`, `monitoring-01`) are **also** on the tailnet directly —
+  joined via a reusable Tailscale auth key (`tailscale up --authkey=... --ssh`), not a one-off
+  manual login each, so re-joining or adding a future VM is one command, not a browser flow per
+  machine. Reachable from anywhere by their own Tailscale addresses, independent of whether the
+  MacBook is on or reachable at all — confirmed for real: SSH from the Mac to each VM's Tailscale
+  IP succeeded on first connection. `--ssh` also enables Tailscale's own SSH server on each VM
+  (identity-based access via the tailnet, alongside the existing key-based OpenSSH access — not a
+  replacement for it).
+- The Proxmox **host** itself (as opposed to the VMs running on it) is not yet on the tailnet —
+  its own Proxmox web UI is still LAN-only, reachable through the MacBook as a bridge exactly as
+  before if ever needed off-LAN.
 
 ## Constraint this creates
 
@@ -33,8 +38,7 @@ service-placement ADR, not just a networking detail.
 
 ## What's not decided yet
 
-- Whether the Proxmox host and its VMs ever join the tailnet directly, instead of being reached
-  through the MacBook
+- Whether the Proxmox host itself (not just its VMs) ever joins the tailnet directly
 - IP addressing / subnet plan for the LAN side
 - Firewall rules beyond "nothing exposed directly to the internet"
 - Whether/how multiple VMs on the Proxmox host get their own network segmentation

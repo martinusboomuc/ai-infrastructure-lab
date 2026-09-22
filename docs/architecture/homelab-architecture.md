@@ -72,13 +72,15 @@ passthrough, safe now that the actual cause is fixed at the host level.
 
 See [ADR-0002](../decisions/0002-proxmox-vm-layout.md) for the reasoning. Provisioned via
 Terraform (`infrastructure/homelab/`) and reachable over SSH as the `ops` user, DHCP-assigned
-addresses on the flat LAN:
+addresses on the flat LAN — and, since Session 020, each also joined directly to the Tailscale
+tailnet (`docs/network/network-topology.md`), reachable by its Tailscale address from anywhere,
+LAN or not:
 
-| VM | Role | RAM | vCPU | Disk | Address (DHCP, may change) |
-| --- | --- | --- | --- | --- | --- |
-| `k8s-01` | Single-node k3s (control-plane + worker combined) | 4 GB | 2 | 60 GB | 192.168.1.183 |
-| `docker-01` | Plain Docker/Compose host for anything outside the cluster | 4 GB | 2 | 40 GB | 192.168.1.115 |
-| `monitoring-01` | Prometheus + Grafana | 2 GB | 1 | 20 GB | 192.168.1.136 |
+| VM | Role | RAM | vCPU | Disk | LAN address (DHCP, may change) | Tailscale address (stable) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `k8s-01` | Single-node k3s (control-plane + worker combined) | 4 GB | 2 | 60 GB | 192.168.1.183 | 100.80.9.107 |
+| `docker-01` | Plain Docker/Compose host for anything outside the cluster | 4 GB | 2 | 40 GB | 192.168.1.115 | 100.127.8.10 |
+| `monitoring-01` | Prometheus + Grafana | 2 GB | 1 | 20 GB | 192.168.1.136 | 100.99.216.113 |
 
 These addresses are DHCP leases, not static reservations — `network-topology.md`'s "What's not
 decided yet" already flags IP addressing as an open item. If a lease changes, re-check with
