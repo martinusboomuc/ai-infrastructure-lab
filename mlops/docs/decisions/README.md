@@ -23,6 +23,7 @@ old one; the old one stays, marked as superseded.
 | [0011](0011-defer-live-azure-deployment.md) | Defer live Azure deployment — Container Apps blocked on Azure for Students | Superseded by [0012](0012-container-apps-region-specific-not-subscription-wide.md) |
 | [0012](0012-container-apps-region-specific-not-subscription-wide.md) | The Container Apps restriction was region-specific, not subscription-wide | Accepted |
 | [0013](0013-self-hosted-mlflow-on-homelab.md) | Self-host the MLflow tracking server on the homelab, artifacts on Azure Blob | Accepted |
+| [0014](0014-training-runs-on-docker-01.md) | BankML training runs on docker-01, not the MacBook | Accepted |
 
 ## Template
 

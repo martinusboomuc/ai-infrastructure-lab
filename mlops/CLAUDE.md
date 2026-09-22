@@ -25,9 +25,10 @@ DVC against a private remote, because several source datasets carry competition 
 redistribution.
 
 **Never hardcode a data path.** The data root comes from the `BANKML_DATA_ROOT` environment
-variable (see `.env.example`). It currently points at a local folder and will later point at a
-homelab machine. An absolute path like `/Users/...` or `/Volumes/...` appearing anywhere in `src/`
-is a bug — it breaks CI and every other machine.
+variable (see `.env.example`). Training runs on `docker-01` now, not the MacBook — see
+[ADR-0014](docs/decisions/0014-training-runs-on-docker-01.md). An absolute path like
+`/Users/...` or `/Volumes/...` appearing anywhere in `src/` is a bug — it breaks CI and every
+other machine.
 
 **Never drop a metric to make a model look better.** Evaluation reports PR-AUC, recall at a fixed
 FPR, alert volume against budget, and expected cost. ROC-AUC alone is never a promotion gate.

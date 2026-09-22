@@ -95,11 +95,27 @@ copy is a working cache. If the machine is lost or wiped, `dvc pull` restores ev
 
 ## Migrating to the homelab
 
-When a homelab machine takes over from the laptop:
+**Done** — see [ADR-0014](../decisions/0014-training-runs-on-docker-01.md). Training now runs on
+`docker-01` over SSH, not the MacBook; the MacBook still clones and edits the repository but no
+longer needs a real dataset locally for anything beyond CI-fixture-scale work.
 
-1. Point `BANKML_DATA_ROOT` and `BANKML_DVC_CACHE` at the new location in `.env`.
-2. Run `dvc pull` to rebuild the workspace from the remote.
+The mechanism really is what was originally planned:
 
-That is the whole migration. Do not plan to carry data across on a physical disk — the datasets
-are public downloads backed by the DVC remote, so restoring from the remote is faster and less
-error-prone than moving a drive between machines with different filesystems.
+1. Point `BANKML_DATA_ROOT` at the *repo-relative* `data/` directory on the new machine
+   (`/home/<user>/ai-infrastructure-lab/mlops/data`, not an arbitrary path) — DVC always checks
+   tracked files out at their tracked path relative to the repo root, so `BANKML_DATA_ROOT` has
+   to agree with that, not point somewhere else. `BANKML_DVC_CACHE` can point anywhere with
+   enough space (`dvc cache dir "$BANKML_DVC_CACHE"` relocates it); the checked-out working files
+   are hardlinks from there into `data/` regardless.
+2. `.env` is not auto-loaded by `uv run` — export it first: `set -a && source .env && set +a`.
+3. Copy `.dvc/config.local` (gitignored, holds the real Azure Storage account key) to the new
+   machine separately; it doesn't come from `git clone`.
+4. Run `dvc pull` to rebuild the workspace from the remote.
+
+What ADR-0014 found doing this for real, worth knowing before doing it again: the DVC remote can
+silently stop existing (it did — a whole Azure storage account, gone, with nothing in this repo
+that could have deleted it), a memory-constrained target machine can OOM running a full-dataset
+pipeline, `libgomp1` isn't installed on a bare VM by default, and `mlflow.tracking.log_run`
+previously never set an explicit MLflow experiment, so it fell into a permanently-broken
+`artifact_location` on any homelab-server-backed run. All of these are now either fixed in code
+or documented as one-time target-machine setup, not repeated risks.

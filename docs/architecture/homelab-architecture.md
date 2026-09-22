@@ -98,6 +98,14 @@ Token, 200 with one), and the deployed Azure Container App authenticates through
 every request via `src/bankml/tracking_auth.py`'s MLflow request header provider. Artifacts still
 live on a local Docker volume, not Azure Blob as ADR-0013 decided.
 
+`docker-01` also runs BankML's actual training pipeline now — see
+[mlops/docs/decisions/0014-training-runs-on-docker-01.md](../../mlops/docs/decisions/0014-training-runs-on-docker-01.md).
+The full Home Credit dataset (2.5GB) and DVC's cache live on this VM (a dedicated `/srv/bankml-data`
+volume for the cache, the repo's own `mlops/data/` for the checked-out working copy DVC requires),
+not the MacBook — training is triggered from the MacBook over SSH, not run against a network
+mount. A 6GB swapfile guards against the training pipeline (which loads all seven relational
+tables into memory at once) OOM-killing the MLflow container this same VM already runs live.
+
 `monitoring-01` runs Prometheus and Grafana — see
 [infrastructure/homelab/monitoring/README.md](../../infrastructure/homelab/monitoring/README.md).
 `node_exporter` runs as a systemd service (not a container, since `k8s-01` runs containerd rather
