@@ -161,9 +161,11 @@ merge flow.
       drift itself, one for the drift job having gone stale (nothing pages anyone if the job
       just stops running silently). Verified firing for real: ran the job against real logged
       predictions, watched the alert go `Pending` then `Firing` in Grafana after the configured
-      grace period. Notification channels (email/Slack) need real credentials this project
-      doesn't have yet — the rule and its evaluation are real and verified, the "page someone"
-      wiring is a configuration step, not implemented here.
+      grace period. Alerts reach a real Discord channel via a native Grafana contact point —
+      Grafana's generic webhook was tried first and confirmed (by inspection, not assumption) to
+      send a fixed JSON envelope no plain-text service like ntfy could render cleanly, so
+      Discord's dedicated, well-formatted integration was used instead. Verified with a real
+      test notification and the already-firing drift alert both landing in the channel.
 - [ ] Delayed-label performance job that runs once labels mature
 - [ ] Retraining triggered by drift or schedule, routed through the Phase 3 gate
 

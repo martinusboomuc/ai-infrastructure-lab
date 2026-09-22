@@ -34,6 +34,33 @@ anything in over 2 days (silently-stopped-running is otherwise invisible with a 
 since it just keeps returning the last value forever). Both verified firing for real against a
 real drift run, not just provisioned and assumed to work.
 
+Alerts actually reach somewhere: a Discord contact point, with the default notification policy
+routed to it. Grafana's generic webhook contact point sends its own fixed JSON envelope with no
+way to reduce it to a plain-text body — confirmed by inspection (pointing a temporary contact
+point at a URL that echoed back exactly what Grafana sent), not assumed — so a plain webhook
+target like ntfy.sh would just show a raw JSON dump, not a clean message. Discord has native,
+well-formatted support built into Grafana, so that's what's wired up; verified with a real test
+notification landing in the channel.
+
+The Discord webhook URL is a credential and isn't in this repository — same treatment as every
+other secret here. Set up on a fresh deploy:
+
+```bash
+GRAFANA_PW=...  # from .env on monitoring-01
+curl -s -u admin:$GRAFANA_PW -X POST http://localhost:3000/api/v1/provisioning/contact-points \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"discord-alerts","type":"discord","settings":{"url":"<your Discord webhook URL>","use_discord_username":true}}'
+
+curl -s -u admin:$GRAFANA_PW -X PUT http://localhost:3000/api/v1/provisioning/policies \
+  -H 'Content-Type: application/json' \
+  -d '{"receiver":"discord-alerts","group_by":["grafana_folder","alertname"]}'
+```
+
+Not file-provisioned deliberately — a committed contact-point file would need either a real
+secret in git or a placeholder that could silently overwrite the real one on a restart
+(file-provisioned resources reconcile on every Grafana startup). The API-created state persists
+in Grafana's own database volume; this is the one-time setup for a genuinely fresh deploy only.
+
 ## Deploying
 
 `node_exporter` first, on each of the three VMs, over SSH:
@@ -122,12 +149,9 @@ in the UI, if any) — not just stop the containers.
 - Per-container metrics on `docker-01` (cAdvisor) and k3s/pod-level metrics on `k8s-01`
   (kube-state-metrics).
 - BankML's own drift job (`make drift`, `mlops/src/bankml/monitoring/drift.py`) has real,
-  verified-firing Grafana alert rules (`grafana/provisioning/alerting/drift.yaml`) — but nothing
-  else in the stack does. A host or the serving app itself going down still pages no one; only
-  drift detection actually alerts right now.
-- Drift alerting's rules fire correctly in Grafana's UI, but no notification channel (email,
-  Slack) is configured — needs real credentials this project doesn't have yet. The rule
-  evaluation is real; "someone actually gets paged" is a configuration step, not done here.
+  verified-firing Grafana alert rules (`grafana/provisioning/alerting/drift.yaml`) that reach a
+  real Discord channel — but nothing else in the stack alerts at all. A host or the serving app
+  itself going down still pages no one; only drift detection does right now.
 - The BankML scrape target is a hardcoded Azure FQDN in `prometheus.yml`, not derived from
   anything — if the Container App is ever recreated with a different auto-generated hostname
   segment, this needs a manual update.
