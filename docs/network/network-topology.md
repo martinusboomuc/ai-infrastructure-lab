@@ -22,9 +22,11 @@ full topology. Sections marked TBD are genuinely undecided, not omitted by accid
   IP succeeded on first connection. `--ssh` also enables Tailscale's own SSH server on each VM
   (identity-based access via the tailnet, alongside the existing key-based OpenSSH access — not a
   replacement for it).
-- The Proxmox **host** itself (as opposed to the VMs running on it) is not yet on the tailnet —
-  its own Proxmox web UI is still LAN-only, reachable through the MacBook as a bridge exactly as
-  before if ever needed off-LAN.
+- The Proxmox **host** itself (`pve01`) is also on the tailnet, the same way as the VMs — its
+  own web UI (`https://<tailscale-ip>:8006`) and SSH both confirmed reachable directly, with
+  `tailscaled` enabled to survive a reboot. Every machine in the homelab is now independently
+  reachable from anywhere; none of them depends on another (including the MacBook) being on or
+  reachable to bridge to it.
 
 ## Constraint this creates
 
@@ -38,7 +40,6 @@ service-placement ADR, not just a networking detail.
 
 ## What's not decided yet
 
-- Whether the Proxmox host itself (not just its VMs) ever joins the tailnet directly
 - IP addressing / subnet plan for the LAN side
 - Firewall rules beyond "nothing exposed directly to the internet"
 - Whether/how multiple VMs on the Proxmox host get their own network segmentation
