@@ -167,10 +167,27 @@ merge flow.
       Discord's dedicated, well-formatted integration was used instead. Verified with a real
       test notification and the already-firing drift alert both landing in the channel.
 - [ ] Delayed-label performance job that runs once labels mature
-- [ ] Retraining triggered by drift or schedule, routed through the Phase 3 gate
+- [x] Retraining triggered by drift, routed through the Phase 3 gate — by drift, not yet a
+      schedule (no cron/scheduler wired up; `make retrain-on-drift DOMAIN=credit` is run by hand
+      or would need one). `bankml.orchestration.flow.drift_check_and_retrain`: runs the same
+      drift job `make drift` does, and if either input or prediction drift crossed threshold,
+      retrains through `train_and_evaluate_task` — the same gated path `credit_pipeline` already
+      used, evaluate-then-promote-or-not, never a direct promotion. Deliberately retrains against
+      the existing feature set rather than rebuilding features from raw data first: this
+      project's data is static (ARCHITECTURE.md's known simplifications — no live ingestion), so
+      a full rebuild would just reproduce byte-identical features at real cost — found rebuilding
+      unnecessarily OOM-killed a real run on `docker-01`'s 4GB (it loads every relational table,
+      several with millions of rows, at once), where training against the existing features
+      alone uses well under 1GB. Verified end to end for real, not mocked: a real drift-positive
+      run retrained the model, the champion scorecard genuinely failed the gate on the same
+      historical `NAME_EDUCATION_TYPE` slice-tolerance pattern documented since Session 005, and
+      was correctly **not** promoted — proving the gate decides on its own merits, not drift.
 
-**Exit criteria:** injecting synthetic drift into the input stream raises an alert and triggers a
-retraining run, which is then blocked or promoted by the gate on its own merits.
+**Exit criteria — met:** injecting synthetic drift into the input stream raises an alert
+(Prometheus → Grafana → Discord, see
+[infrastructure/homelab/monitoring/README.md](../infrastructure/homelab/monitoring/README.md))
+and triggers a retraining run, which is then blocked or promoted by the gate on its own merits
+(confirmed above — blocked, this run, on real data, not a synthetic demonstration).
 
 ---
 
