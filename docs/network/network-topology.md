@@ -9,15 +9,17 @@ full topology. Sections marked TBD are genuinely undecided, not omitted by accid
 
 - MacBook and the homelab Proxmox host are on the same local network.
 - Wake-on-LAN is configured and working from the MacBook to the homelab host.
-- Remote management of the homelab (Proxmox web UI, SSH) happens over the local network only.
-  Nothing on the homelab is exposed to the public internet today.
-
-## Planned
-
-- **External (off-LAN) access via VPN**, so the homelab can be managed and reached from outside
-  the local network without exposing management interfaces directly to the internet.
-- Specific VPN technology (e.g. WireGuard, Tailscale, OpenVPN), addressing/subnet layout, and
-  firewall rules: **TBD** — to be decided and documented here once chosen, not before.
+- **External (off-LAN) access is Tailscale**, decided and set up: the MacBook and the repository
+  owner's iPhone are both on the same tailnet (WireGuard-based mesh, no port forwarding, nothing
+  exposed to the public internet — matches the "management interfaces never exposed directly"
+  principle exactly). SSH to the MacBook now works from anywhere via its Tailscale address, not
+  only from the home LAN.
+- The Proxmox host and the three VMs (`k8s-01`, `docker-01`, `monitoring-01`) are **not** on the
+  tailnet themselves — still LAN-only. This isn't a gap in practice: the MacBook is reachable
+  from anywhere via Tailscale *and* still sits on the home LAN whenever it's physically there, so
+  it acts as the bridge — SSH to the Mac over Tailscale, then SSH from the Mac's own shell to any
+  VM exactly as before. Putting the VMs on the tailnet directly is possible later if reaching
+  them without the Mac in the loop ever becomes necessary; not needed for anything today.
 
 ## Constraint this creates
 
@@ -31,7 +33,8 @@ service-placement ADR, not just a networking detail.
 
 ## What's not decided yet
 
-- VPN technology and configuration
-- IP addressing / subnet plan
+- Whether the Proxmox host and its VMs ever join the tailnet directly, instead of being reached
+  through the MacBook
+- IP addressing / subnet plan for the LAN side
 - Firewall rules beyond "nothing exposed directly to the internet"
 - Whether/how multiple VMs on the Proxmox host get their own network segmentation

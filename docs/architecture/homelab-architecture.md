@@ -53,11 +53,12 @@ passthrough, safe now that the actual cause is fixed at the host level.
 
 - **Wake-on-LAN** is configured and working — the machine can be powered on remotely from the
   MacBook.
-- Today, remote management happens over the local network.
-- **Planned:** external (off-LAN) access via VPN. Management interfaces are deliberately never
-  exposed directly to the internet. See
-  [network-topology.md](../network/network-topology.md) for what's actually decided about this
-  versus still open.
+- Remote management of the Proxmox host and its VMs happens over the local network. Off-LAN, the
+  MacBook itself is reachable from anywhere via Tailscale (a WireGuard-based mesh, no exposed
+  ports) and, whenever it's also on the home LAN, acts as the bridge to everything else —
+  management interfaces are still never exposed directly to the internet. See
+  [network-topology.md](../network/network-topology.md) for the full picture, including what's
+  still genuinely undecided.
 
 ## Role split
 
