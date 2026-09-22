@@ -2,9 +2,11 @@
 
 > Production-inspired MLOps platform for banking machine learning — built one vertical slice at a time.
 
-**Status:** Phase 4 · Serving and deployment (in progress) · A Container App runs live on Azure
-and serves real scored Credit Risk decisions with reason codes, backed by a self-hosted MLflow
-tracking server reachable over a Cloudflare Tunnel. See [ROADMAP.md](ROADMAP.md).
+**Status:** Phase 5 done · Monitoring and retraining (Credit Risk) · A Container App runs live on
+Azure, serves real scored Credit Risk decisions with reason codes, and is watched by drift
+detection, alerting and drift-triggered retraining through the Phase 3 gate. Phase 4's one
+remaining item (verifying the teardown script) is deliberately deferred, not blocking. See
+[ROADMAP.md](ROADMAP.md).
 
 BankML Platform reproduces how a bank builds, ships, monitors and governs machine learning
 models in production.

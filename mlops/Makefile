@@ -1,4 +1,4 @@
-.PHONY: setup lint test check-data data features train serve flow drift retrain-on-drift
+.PHONY: setup lint test check-data data features train serve flow drift retrain-on-drift delayed-performance
 
 setup:
 	uv sync
@@ -35,3 +35,6 @@ drift: check-data
 
 retrain-on-drift: check-data
 	uv run python -m bankml.orchestration.flow --flow drift-check-and-retrain --domain $(DOMAIN)
+
+delayed-performance: check-data
+	uv run python -m bankml.monitoring.delayed_performance --domain $(DOMAIN)

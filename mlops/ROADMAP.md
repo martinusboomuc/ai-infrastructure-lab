@@ -124,7 +124,7 @@ merge flow.
 
 ---
 
-## Phase 5 — Monitoring and retraining (Credit Risk)
+## Phase 5 — Monitoring and retraining (Credit Risk) *(done)*
 
 - [x] Prometheus metrics exposed (`GET /metrics`, `src/bankml/serving/metrics.py`); Grafana
       dashboard for latency, throughput and errors, scraping the live Azure endpoint from
@@ -166,7 +166,22 @@ merge flow.
       send a fixed JSON envelope no plain-text service like ntfy could render cleanly, so
       Discord's dedicated, well-formatted integration was used instead. Verified with a real
       test notification and the already-firing drift alert both landing in the channel.
-- [ ] Delayed-label performance job that runs once labels mature
+- [x] Delayed-label performance job that runs once labels mature —
+      `src/bankml/monitoring/delayed_performance.py`, `make delayed-performance DOMAIN=credit`.
+      Filters the (durable, both-sinks) prediction log to requests old enough that
+      `configs/credit.yaml`'s own `label.maturity_days` (540) has elapsed since they were
+      served, matches `applicant_id` against the domain's processed feature set's real
+      `TARGET` column for ground truth (this project's data is static — there is no live
+      outcome-reporting pipeline, so a served applicant with a synthetic ID has no checkable
+      outcome, correctly reported as `no_labeled_matured_predictions` rather than fabricated),
+      then compares the *actual logged decision* (not a re-derived threshold) against what
+      really happened: a real confusion matrix, precision/recall/accuracy, and PR-AUC/ROC-AUC
+      when both classes are present. Tested against synthetic fixtures
+      (`tests/monitoring/test_delayed_performance.py`, 8 tests) and verified against real data
+      twice — once honestly returning `no_matured_predictions` against the real (very recent)
+      prediction log, and once by injecting a real historical applicant ID (`SK_ID_CURR=100002`,
+      a genuine defaulter) as an artificially-aged record and confirming it was correctly scored
+      as a true positive against the real ground truth.
 - [x] Retraining triggered by drift, routed through the Phase 3 gate — by drift, not yet a
       schedule (no cron/scheduler wired up; `make retrain-on-drift DOMAIN=credit` is run by hand
       or would need one). `bankml.orchestration.flow.drift_check_and_retrain`: runs the same

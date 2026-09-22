@@ -17,13 +17,9 @@ Credit-specific for now (imports `bankml.features.credit.prepare` directly), mat
 built end to end (ADR-0002's vertical-slice-first) — not a deliberate limitation to work around,
 just not generalized past one domain yet.
 
-**Known gap, not fixed here**: the deployed Azure Container App's prediction log lives at
-`BANKML_PREDICTION_LOG_DIR=/data/predictions` *inside the container's own filesystem* (baked
-into the Dockerfile), with no persistent volume mounted — every prediction it serves is lost on
-restart, redeploy, or scale-to-zero. This job reads whatever prediction log actually exists
-(e.g. from local runs), but there is currently no durable log of real production traffic to run
-it against. Fixing that (a durable sink — Azure Blob, a database, anything outside the
-container) is separate work, not something a drift job can paper over.
+Reads `serving/prediction_log.py`'s merged record set (`read_all_records`) — the local file plus
+the durable Azure Blob copy, deduped by `request_id` — so this sees real production traffic, not
+just whatever happens to still be on the deployed container's own ephemeral filesystem.
 """
 
 from __future__ import annotations
@@ -45,62 +41,20 @@ from evidently.presets import DataDriftPreset
 from mlflow import MlflowClient
 
 from bankml.features.credit.prepare import feature_columns, prepare_features
-from bankml.serving.prediction_log import AZURE_CONTAINER as AZURE_PREDICTION_CONTAINER
-from bankml.serving.prediction_log import prediction_log_dir
+from bankml.serving.prediction_log import read_all_records
 
 DEFAULT_PSI_THRESHOLD = (
     0.2  # industry-standard cutoff: <0.1 stable, 0.1-0.2 moderate, >0.2 significant
 )
 
 
-def _iter_azure_blob_records(domain: str) -> list[dict[str, Any]]:
-    """The durable copy of the prediction log (`serving/prediction_log.py`'s Blob sink) — the
-    one that actually has real production traffic, since the deployed Azure app's local
-    filesystem doesn't survive a restart. A no-op, not an error, when
-    `AZURE_STORAGE_CONNECTION_STRING` isn't set (e.g. running this locally against only
-    locally-logged predictions).
-    """
-    connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-    if not connection_string:
-        return []
-
-    from azure.storage.blob import ContainerClient
-
-    container = ContainerClient.from_connection_string(
-        connection_string, container_name=AZURE_PREDICTION_CONTAINER
-    )
-    if not container.exists():
-        return []
-
-    records: list[dict[str, Any]] = []
-    for blob in container.list_blobs(name_starts_with=f"{domain}/"):
-        content = container.download_blob(blob.name).readall().decode("utf-8")
-        for line in content.splitlines():
-            if line.strip():
-                records.append(json.loads(line))
-    return records
-
-
 def load_current_from_prediction_log(domain: str) -> pd.DataFrame:
     """Reconstruct one row per logged prediction — the feature vector plus the score the model
-    actually produced — from every local `*.jsonl` file under the domain's prediction log
-    directory, merged with the durable Azure Blob copy when configured. Deduped by
-    `request_id` (the same record can legitimately exist in both sinks). Empty DataFrame if
-    nothing has been logged anywhere yet.
+    actually produced — from every prediction record `read_all_records` returns (merged across
+    both sinks, deduped by `request_id`). Empty DataFrame if nothing has been logged anywhere yet.
     """
-    log_dir = prediction_log_dir(domain)
-    by_request_id: dict[str, dict[str, Any]] = {}
-    for path in sorted(log_dir.glob("*.jsonl")):
-        for line in path.read_text().splitlines():
-            if not line.strip():
-                continue
-            rec = json.loads(line)
-            by_request_id[rec["request_id"]] = rec
-    for rec in _iter_azure_blob_records(domain):
-        by_request_id.setdefault(rec["request_id"], rec)
-
     records = []
-    for rec in by_request_id.values():
+    for rec in read_all_records(domain):
         row = dict(rec["feature_vector"])
         row["score"] = rec["score"]
         records.append(row)
