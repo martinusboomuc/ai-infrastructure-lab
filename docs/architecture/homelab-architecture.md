@@ -95,8 +95,10 @@ a Cloudflare Tunnel gated by Cloudflare Access) — see
 and [infrastructure/homelab/mlflow/README.md](../../infrastructure/homelab/mlflow/README.md).
 Live and verified reachable at `https://mlflow.homelab-boom.com` (403 without an Access Service
 Token, 200 with one), and the deployed Azure Container App authenticates through it correctly on
-every request via `src/bankml/tracking_auth.py`'s MLflow request header provider. Artifacts still
-live on a local Docker volume, not Azure Blob as ADR-0013 decided.
+every request via `src/bankml/tracking_auth.py`'s MLflow request header provider. Artifacts live
+on Azure Blob (`bankml-data-rg/bankmldvcstore/mlflow-artifacts`), matching ADR-0013's decided
+design in full — the existing production model's artifacts were migrated across, not left
+behind, and the deployed Container App still loads it and returns an identical prediction.
 
 `docker-01` also runs BankML's actual training pipeline now — see
 [mlops/docs/decisions/0014-training-runs-on-docker-01.md](../../mlops/docs/decisions/0014-training-runs-on-docker-01.md).

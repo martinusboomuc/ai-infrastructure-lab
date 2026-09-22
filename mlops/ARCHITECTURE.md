@@ -250,5 +250,5 @@ Stated openly, because pretending otherwise is the failure mode this project exi
   gated by Access ([ADR-0013](docs/decisions/0013-self-hosted-mlflow-on-homelab.md)) instead of a
   laptop-only SQLite file. A `credit-champion` model is registered and promoted against that
   server, and the live endpoint returns real scored decisions with SHAP reason codes and a model
-  version. Artifact storage still lives on a local Docker volume on `docker-01`, not Azure Blob as
-  ADR-0013 decided.
+  version. Artifact storage lives on Azure Blob, matching ADR-0013's decided design in full — not
+  a local Docker volume on `docker-01`.

@@ -116,8 +116,7 @@ scored decisions:
  "reason_codes":[{"feature":"EXT_SOURCE_3","shap_value":-0.34710569936954694}, ...]}
 ```
 
-Remaining open items, none of which block the exit criteria: artifacts still live on a local
-Docker volume on `docker-01`, not Azure Blob as ADR-0013 decided; and adding
+Remaining open item, doesn't block the exit criteria: adding
 `AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets would make
 `mlops-deploy.yml`'s deploy job real (currently skips cleanly without them) — until then, rolling
 out a new revision is done by hand via `infrastructure/cloud/bankml-provision.sh` or a direct

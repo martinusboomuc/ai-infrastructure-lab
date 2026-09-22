@@ -14,8 +14,12 @@ authenticates via Access using the `bankml-container-app` Service Token (sent au
 `POST /predict/credit` on the live Azure endpoint both return genuine responses — a real score,
 decision, threshold and SHAP-derived reason codes — see mlops' own ROADMAP.md, Phase 4.
 
-Also still open: artifact storage is a **local Docker volume**, not Azure Blob as ADR-0013
-decided.
+Artifacts live on Azure Blob (`bankml-data-rg/bankmldvcstore/mlflow-artifacts`), not a local
+Docker volume, matching ADR-0013's decided design in full. Migrated the existing
+production model's artifacts across before switching (not a fresh start) — verified the
+deployed Azure Container App still loads `credit-champion@production` and returns an identical
+prediction after the cutover, and confirmed a fresh training run's artifacts land in the new
+container, not any leftover local path.
 
 ## Deploying
 
@@ -25,7 +29,7 @@ On `docker-01`, over SSH:
 git clone https://github.com/martinusboomuc/ai-infrastructure-lab.git
 cd ai-infrastructure-lab/infrastructure/homelab/mlflow
 cp .env.example .env
-# edit .env with a real POSTGRES_PASSWORD
+# edit .env with a real POSTGRES_PASSWORD and AZURE_STORAGE_CONNECTION_STRING
 
 docker compose up -d
 ```
@@ -94,4 +98,6 @@ logged run and model, not just stops the containers.
 
 ## What's still open
 
-- Artifact storage on Azure Blob instead of the local `mlflow-artifacts` volume.
+Nothing from ADR-0013's original design remains open. Newer, separate items live in
+`mlops/ROADMAP.md`'s Phase 5 (drift monitoring, alerting) and this repo's own `monitoring/`
+stack.
