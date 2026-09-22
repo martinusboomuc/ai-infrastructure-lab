@@ -6,11 +6,14 @@ into the input stream raises an alert.
 
 from __future__ import annotations
 
+import json
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from bankml.monitoring.drift import compute_drift
+from bankml.monitoring.drift import compute_drift, load_current_from_prediction_log
 
 
 @pytest.fixture
@@ -106,3 +109,86 @@ def test_raises_when_reference_and_current_share_no_comparable_columns():
 
     with pytest.raises(ValueError, match="no columns"):
         compute_drift(reference, current)
+
+
+def _prediction_record(request_id: str, amt_credit: float) -> dict:
+    return {
+        "request_id": request_id,
+        "score": 0.1,
+        "feature_vector": {"AMT_CREDIT": amt_credit},
+    }
+
+
+def test_load_current_reads_local_records_when_azure_is_not_configured(monkeypatch, tmp_path):
+    monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+    log_dir = tmp_path / "credit"
+    log_dir.mkdir()
+    (log_dir / "2026-01-01.jsonl").write_text(
+        json.dumps(_prediction_record("local-1", 100.0)) + "\n"
+    )
+
+    result = load_current_from_prediction_log("credit")
+
+    assert len(result) == 1
+    assert result.iloc[0]["AMT_CREDIT"] == 100.0
+
+
+def test_load_current_merges_local_and_azure_blob_records(monkeypatch, tmp_path):
+    monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "fake-connection-string")
+    log_dir = tmp_path / "credit"
+    log_dir.mkdir()
+    (log_dir / "2026-01-01.jsonl").write_text(
+        json.dumps(_prediction_record("local-1", 100.0)) + "\n"
+    )
+
+    mock_blob = MagicMock()
+    mock_blob.name = "credit/2026-01-01.jsonl"
+    mock_download = MagicMock()
+    mock_download.readall.return_value = (
+        json.dumps(_prediction_record("blob-1", 200.0)) + "\n"
+    ).encode()
+
+    mock_container = MagicMock()
+    mock_container.exists.return_value = True
+    mock_container.list_blobs.return_value = [mock_blob]
+    mock_container.download_blob.return_value = mock_download
+
+    with patch(
+        "azure.storage.blob.ContainerClient.from_connection_string", return_value=mock_container
+    ):
+        result = load_current_from_prediction_log("credit")
+
+    # two distinct request_ids, one from each sink — both present, not deduplicated away
+    assert sorted(result["AMT_CREDIT"]) == [100.0, 200.0]
+
+
+def test_load_current_does_not_double_count_a_record_present_in_both_sinks(monkeypatch, tmp_path):
+    monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "fake-connection-string")
+    log_dir = tmp_path / "credit"
+    log_dir.mkdir()
+    (log_dir / "2026-01-01.jsonl").write_text(
+        json.dumps(_prediction_record("shared-1", 100.0)) + "\n"
+    )
+
+    mock_blob = MagicMock()
+    mock_blob.name = "credit/2026-01-01.jsonl"
+    mock_download = MagicMock()
+    # same request_id as the local record — this is expected (both sinks get every write)
+    mock_download.readall.return_value = (
+        json.dumps(_prediction_record("shared-1", 100.0)) + "\n"
+    ).encode()
+
+    mock_container = MagicMock()
+    mock_container.exists.return_value = True
+    mock_container.list_blobs.return_value = [mock_blob]
+    mock_container.download_blob.return_value = mock_download
+
+    with patch(
+        "azure.storage.blob.ContainerClient.from_connection_string", return_value=mock_container
+    ):
+        result = load_current_from_prediction_log("credit")
+
+    assert len(result) == 1

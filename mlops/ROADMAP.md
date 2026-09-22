@@ -145,11 +145,15 @@ merge flow.
       including three real edge cases found doing so (an all-null relational-aggregate column, a
       string column Evidently's small-sample inference misread as free text, and a boolean column
       that crashed Evidently's own numeric-stats path) — all now handled explicitly, not by luck.
-      **Known gap, not fixed here**: the deployed Azure Container App's prediction log lives
-      inside the container's own filesystem with no persistent volume — every prediction it
-      serves is lost on restart/redeploy/scale-to-zero, so there's currently no durable log of
-      real production traffic to run this job against in production. A durable sink (Azure Blob,
-      a database) is separate work.
+      The ephemeral-prediction-log gap this surfaced is now fixed too: `write_prediction_record`
+      writes to a local file (unchanged) and, when `AZURE_STORAGE_CONNECTION_STRING` is set, also
+      appends to a durable Azure Blob append blob in the same storage account DVC and MLflow's
+      artifacts already use (`bankml-data-rg/bankmldvcstore/predictions`) — best-effort, so a
+      blob-write failure never fails an already-scored prediction request. `drift.py`'s own
+      `load_current_from_prediction_log` reads and merges both sinks (deduped by `request_id`).
+      Wired into the deployed Container App's Key Vault secrets and env vars
+      (`infrastructure/cloud/bankml-provision.sh`), verified end to end with a real local run: a
+      real prediction request produced a real record in the real Blob container.
 - [ ] Drift alerting with configured thresholds
 - [ ] Delayed-label performance job that runs once labels mature
 - [ ] Retraining triggered by drift or schedule, routed through the Phase 3 gate

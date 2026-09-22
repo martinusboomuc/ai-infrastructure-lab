@@ -44,6 +44,7 @@ from evidently.presets import DataDriftPreset
 from mlflow import MlflowClient
 
 from bankml.features.credit.prepare import feature_columns, prepare_features
+from bankml.serving.prediction_log import AZURE_CONTAINER as AZURE_PREDICTION_CONTAINER
 from bankml.serving.prediction_log import prediction_log_dir
 
 DEFAULT_PSI_THRESHOLD = (
@@ -51,21 +52,57 @@ DEFAULT_PSI_THRESHOLD = (
 )
 
 
+def _iter_azure_blob_records(domain: str) -> list[dict[str, Any]]:
+    """The durable copy of the prediction log (`serving/prediction_log.py`'s Blob sink) — the
+    one that actually has real production traffic, since the deployed Azure app's local
+    filesystem doesn't survive a restart. A no-op, not an error, when
+    `AZURE_STORAGE_CONNECTION_STRING` isn't set (e.g. running this locally against only
+    locally-logged predictions).
+    """
+    connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+    if not connection_string:
+        return []
+
+    from azure.storage.blob import ContainerClient
+
+    container = ContainerClient.from_connection_string(
+        connection_string, container_name=AZURE_PREDICTION_CONTAINER
+    )
+    if not container.exists():
+        return []
+
+    records: list[dict[str, Any]] = []
+    for blob in container.list_blobs(name_starts_with=f"{domain}/"):
+        content = container.download_blob(blob.name).readall().decode("utf-8")
+        for line in content.splitlines():
+            if line.strip():
+                records.append(json.loads(line))
+    return records
+
+
 def load_current_from_prediction_log(domain: str) -> pd.DataFrame:
-    """Reconstruct one row per logged prediction from every `*.jsonl` file under the domain's
-    prediction log directory — the feature vector plus the score the model actually produced.
-    Empty DataFrame if nothing has been logged yet.
+    """Reconstruct one row per logged prediction — the feature vector plus the score the model
+    actually produced — from every local `*.jsonl` file under the domain's prediction log
+    directory, merged with the durable Azure Blob copy when configured. Deduped by
+    `request_id` (the same record can legitimately exist in both sinks). Empty DataFrame if
+    nothing has been logged anywhere yet.
     """
     log_dir = prediction_log_dir(domain)
-    records: list[dict[str, Any]] = []
+    by_request_id: dict[str, dict[str, Any]] = {}
     for path in sorted(log_dir.glob("*.jsonl")):
         for line in path.read_text().splitlines():
             if not line.strip():
                 continue
             rec = json.loads(line)
-            row = dict(rec["feature_vector"])
-            row["score"] = rec["score"]
-            records.append(row)
+            by_request_id[rec["request_id"]] = rec
+    for rec in _iter_azure_blob_records(domain):
+        by_request_id.setdefault(rec["request_id"], rec)
+
+    records = []
+    for rec in by_request_id.values():
+        row = dict(rec["feature_vector"])
+        row["score"] = rec["score"]
+        records.append(row)
     return pd.DataFrame(records)
 
 

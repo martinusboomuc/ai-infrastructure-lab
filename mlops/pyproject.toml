@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "BankML Platform: a production-inspired MLOps platform for banking ML"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "azure-storage-blob>=12.30.2",
     "dvc[azure]>=3.67.1",
     "evidently>=0.7.23",
     "fastapi>=0.118.0",

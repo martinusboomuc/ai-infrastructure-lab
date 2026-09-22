@@ -47,6 +47,13 @@ GHCR_IMAGE="${GHCR_IMAGE:?Set GHCR_IMAGE, e.g. ghcr.io/<owner>/<repo>/bankml-ser
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID:?Set CF_ACCESS_CLIENT_ID (the bankml-container-app Service Token's Client ID)}"
 CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET:?Set CF_ACCESS_CLIENT_SECRET (the bankml-container-app Service Token's Client Secret)}"
+# The same durable storage account DVC's remote and MLflow's artifacts already use (Session 012,
+# ADR-0013) — a "predictions" container there is the deployed app's durable prediction log, since
+# BANKML_PREDICTION_LOG_DIR is a path inside the container's own filesystem with no persistent
+# volume mounted (mlops/src/bankml/serving/prediction_log.py's docstring). Not a required input:
+# derived below from resources this project already controls, not asked of the caller.
+DATA_RESOURCE_GROUP="${DATA_RESOURCE_GROUP:-bankml-data-rg}"
+DATA_STORAGE_ACCOUNT="${DATA_STORAGE_ACCOUNT:-bankmldvcstore}"
 
 echo "== BankML Azure provisioning =="
 echo "Resource group:     $RESOURCE_GROUP ($LOCATION)"
@@ -98,6 +105,21 @@ az keyvault secret set \
   --vault-name "$KEY_VAULT_NAME" \
   --name "cf-access-client-secret" \
   --value "$CF_ACCESS_CLIENT_SECRET" \
+  --output none
+
+# Durable prediction logging (see the DATA_RESOURCE_GROUP/DATA_STORAGE_ACCOUNT note above).
+# Requires the "predictions" container to already exist — `az storage container create --name
+# predictions --account-name "$DATA_STORAGE_ACCOUNT" ...`, a one-time step, not repeated here
+# since this script only touches $RESOURCE_GROUP's own resources everywhere else.
+AZURE_STORAGE_CONNECTION_STRING="$(az storage account show-connection-string \
+  --resource-group "$DATA_RESOURCE_GROUP" \
+  --name "$DATA_STORAGE_ACCOUNT" \
+  --query connectionString --output tsv)"
+
+az keyvault secret set \
+  --vault-name "$KEY_VAULT_NAME" \
+  --name "azure-storage-connection-string" \
+  --value "$AZURE_STORAGE_CONNECTION_STRING" \
   --output none
 
 echo "-- Container Apps environment (scale-to-zero by default per app, not the environment) --"
@@ -173,9 +195,10 @@ az containerapp secret set \
     "mlflow-tracking-uri=keyvaultref:https://$KEY_VAULT_NAME.vault.azure.net/secrets/mlflow-tracking-uri,identityref:system" \
     "cf-access-client-id=keyvaultref:https://$KEY_VAULT_NAME.vault.azure.net/secrets/cf-access-client-id,identityref:system" \
     "cf-access-client-secret=keyvaultref:https://$KEY_VAULT_NAME.vault.azure.net/secrets/cf-access-client-secret,identityref:system" \
+    "azure-storage-connection-string=keyvaultref:https://$KEY_VAULT_NAME.vault.azure.net/secrets/azure-storage-connection-string,identityref:system" \
   --output none
 
-# --set-env-vars replaces the container's entire env var list, not just these three — harmless
+# --set-env-vars replaces the container's entire env var list, not just these four — harmless
 # today since the app was created with none at all, but if anything else is ever added via the
 # Portal directly instead of here, a future run of this script will silently drop it. Add it
 # here, not in the Portal, if that ever happens.
@@ -186,6 +209,7 @@ az containerapp update \
     MLFLOW_TRACKING_URI=secretref:mlflow-tracking-uri \
     CF_ACCESS_CLIENT_ID=secretref:cf-access-client-id \
     CF_ACCESS_CLIENT_SECRET=secretref:cf-access-client-secret \
+    AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string \
   --output none
 
 echo
