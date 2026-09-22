@@ -37,6 +37,7 @@ def _dvc_data_version(mlops_root: Path) -> str:
 
 
 def log_run(
+    domain: str,
     role: str,
     model_type: str,
     model,
@@ -47,8 +48,20 @@ def log_run(
     mlops_root: Path,
     categories: dict[str, list] | None = None,
 ) -> str:
-    """Log one champion/challenger run to MLflow. Returns the MLflow run ID."""
-    with mlflow.start_run(run_name=f"credit-{role}") as run:
+    """Log one champion/challenger run to MLflow. Returns the MLflow run ID.
+
+    Explicitly sets the experiment by domain name rather than leaving every run to fall into
+    MLflow's "Default" experiment (id 0). An experiment's `artifact_location` is fixed at
+    creation time and never changes retroactively — the homelab MLflow server's Default
+    experiment was created before ADR-0013's proxied-artifact fix landed, so it's permanently
+    stuck pointing at a bare filesystem path no remote client can write to
+    (`PermissionError: [Errno 13] Permission denied: '/mlflow'`, found running training from
+    docker-01). A per-domain experiment, created fresh, always inherits the server's *current*
+    default-artifact-root — this is what actually fixes it, not a one-off manually-created
+    experiment that the next person (or the next machine) won't know to point at.
+    """
+    mlflow.set_experiment(domain)
+    with mlflow.start_run(run_name=f"{domain}-{role}") as run:
         mlflow.log_param("role", role)
         mlflow.log_param("model_type", model_type)
 

@@ -129,6 +129,7 @@ def main(domain: str = "credit") -> None:
             domain, role, model_type, results["metrics"][role], results["slice_metrics"][role]
         )
         run_id = log_run(
+            domain,
             role,
             model_type,
             results["models"][role],
