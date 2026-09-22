@@ -36,3 +36,13 @@ scrape_configs:
       - targets: ["bankml-credit-serving.delightfulgrass-66b6c9e3.spaincentral.azurecontainerapps.io"]
         labels:
           role: bankml-credit-serving
+
+  # bankml.monitoring.drift (a batch job, `make drift`) pushes here after each run — see
+  # docker-compose.yml's own comment on why a Pushgateway exists at all for a one-shot job.
+  # `honor_labels: true` keeps the job/instance labels the push itself set instead of Prometheus
+  # overwriting them with the scrape target's own — otherwise every pushed metric would show up
+  # labeled as if it came from "pushgateway" itself, losing which domain's drift run it was.
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ["pushgateway:9091"]

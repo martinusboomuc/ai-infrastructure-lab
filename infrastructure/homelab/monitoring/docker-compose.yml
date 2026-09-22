@@ -2,6 +2,8 @@ services:
   prometheus:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
+    depends_on:
+      - pushgateway
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -11,6 +13,16 @@ services:
       - --storage.tsdb.retention.time=30d
     ports:
       - "9090:9090"
+
+  # `bankml.monitoring.drift` is a one-shot batch job (`make drift`), not a long-running server —
+  # Prometheus's own pull model has nothing to scrape between runs. The Pushgateway is the
+  # standard bridge: the job pushes once when it finishes, Prometheus scrapes the gateway (below)
+  # on its normal interval like any other target.
+  pushgateway:
+    image: prom/pushgateway:v1.11.0
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
 
   grafana:
     image: grafana/grafana:11.3.0

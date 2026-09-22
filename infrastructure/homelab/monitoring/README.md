@@ -25,6 +25,15 @@ start can also make the very first scrape after idle time-out, which is expected
 This covers host-level metrics and BankML's serving app. Not yet covered: per-container metrics
 on `docker-01` (cAdvisor), or k3s/pod-level metrics on `k8s-01` (kube-state-metrics).
 
+A Prometheus Pushgateway also runs here (port 9091) — `mlops`'s drift job
+(`mlops/src/bankml/monitoring/drift.py`, `make drift DOMAIN=credit`) is a one-shot batch job, not
+a server Prometheus can scrape directly, so it pushes its results here instead after each run.
+Two Grafana alert rules (`grafana/provisioning/alerting/drift.yaml`) watch what lands: one fires
+when drift crosses its configured PSI threshold, the other fires if the job hasn't pushed
+anything in over 2 days (silently-stopped-running is otherwise invisible with a Pushgateway,
+since it just keeps returning the last value forever). Both verified firing for real against a
+real drift run, not just provisioned and assumed to work.
+
 ## Deploying
 
 `node_exporter` first, on each of the three VMs, over SSH:
@@ -112,8 +121,13 @@ in the UI, if any) — not just stop the containers.
 
 - Per-container metrics on `docker-01` (cAdvisor) and k3s/pod-level metrics on `k8s-01`
   (kube-state-metrics).
-- Alerting (Alertmanager, or Grafana's own alerting) — nothing pages anyone yet, this is
-  dashboards only.
+- BankML's own drift job (`make drift`, `mlops/src/bankml/monitoring/drift.py`) has real,
+  verified-firing Grafana alert rules (`grafana/provisioning/alerting/drift.yaml`) — but nothing
+  else in the stack does. A host or the serving app itself going down still pages no one; only
+  drift detection actually alerts right now.
+- Drift alerting's rules fire correctly in Grafana's UI, but no notification channel (email,
+  Slack) is configured — needs real credentials this project doesn't have yet. The rule
+  evaluation is real; "someone actually gets paged" is a configuration step, not done here.
 - The BankML scrape target is a hardcoded Azure FQDN in `prometheus.yml`, not derived from
   anything — if the Container App is ever recreated with a different auto-generated hostname
   segment, this needs a manual update.

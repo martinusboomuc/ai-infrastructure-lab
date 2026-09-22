@@ -13,7 +13,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from bankml.monitoring.drift import compute_drift, load_current_from_prediction_log
+from bankml.monitoring.drift import (
+    compute_drift,
+    load_current_from_prediction_log,
+    push_drift_metrics,
+)
 
 
 @pytest.fixture
@@ -192,3 +196,57 @@ def test_load_current_does_not_double_count_a_record_present_in_both_sinks(monke
         result = load_current_from_prediction_log("credit")
 
     assert len(result) == 1
+
+
+def _drift_result(input_drift: bool, prediction_drift: bool) -> dict:
+    return {
+        "input_drift": {
+            "dataset_drift": input_drift,
+            "drifted_share": 0.6 if input_drift else 0.1,
+            "features": {
+                "income": {"psi": 0.5, "drifted": True},
+                "age": {"psi": 0.02, "drifted": False},
+            },
+        },
+        "prediction_drift": {
+            "dataset_drift": prediction_drift,
+            "drifted_share": 1.0 if prediction_drift else 0.0,
+            "features": {
+                "score": {"psi": 0.9 if prediction_drift else 0.01, "drifted": prediction_drift}
+            },
+        },
+    }
+
+
+def test_push_drift_metrics_sends_dataset_drift_and_per_feature_psi():
+    with patch("prometheus_client.push_to_gateway") as mock_push:
+        push_drift_metrics("credit", _drift_result(True, False), "http://fake-gateway:9091")
+
+    mock_push.assert_called_once()
+    _, kwargs = mock_push.call_args
+    registry = kwargs["registry"]
+    samples = {
+        (m.name, tuple(sorted(s.labels.items()))): s.value
+        for m in registry.collect()
+        for s in m.samples
+        if s.name.endswith(("_dataset_drift", "_feature_psi"))
+    }
+    assert samples[("bankml_drift_dataset_drift", (("domain", "credit"), ("kind", "input")))] == 1.0
+    assert (
+        samples[("bankml_drift_dataset_drift", (("domain", "credit"), ("kind", "prediction")))]
+        == 0.0
+    )
+    assert (
+        samples[("bankml_drift_feature_psi", (("domain", "credit"), ("feature", "income")))] == 0.5
+    )
+
+
+def test_push_drift_metrics_pushes_to_the_configured_gateway_url():
+    with patch("prometheus_client.push_to_gateway") as mock_push:
+        push_drift_metrics("credit", _drift_result(False, False), "http://fake-gateway:9091")
+
+    args, kwargs = mock_push.call_args
+    assert (
+        args[0] == "http://fake-gateway:9091" or kwargs.get("gateway") == "http://fake-gateway:9091"
+    )
+    assert kwargs["job"] == "bankml_drift_credit"

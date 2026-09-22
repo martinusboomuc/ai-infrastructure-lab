@@ -2,6 +2,10 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    # Pinned, not Grafana's own auto-generated UID — alert rules (provisioning/alerting/) refer
+    # to this datasource by UID, so a fresh deploy needs a stable, known value to reference
+    # rather than whatever random UID Grafana would otherwise assign.
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090

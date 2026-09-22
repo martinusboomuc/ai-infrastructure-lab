@@ -154,7 +154,16 @@ merge flow.
       Wired into the deployed Container App's Key Vault secrets and env vars
       (`infrastructure/cloud/bankml-provision.sh`), verified end to end with a real local run: a
       real prediction request produced a real record in the real Blob container.
-- [ ] Drift alerting with configured thresholds
+- [x] Drift alerting with configured thresholds — `make drift` pushes metrics
+      (`bankml_drift_dataset_drift`, per-feature `bankml_drift_feature_psi`) to a Prometheus
+      Pushgateway on `monitoring-01`; two Grafana alert rules
+      (`infrastructure/homelab/monitoring/grafana/provisioning/alerting/drift.yaml`), one for
+      drift itself, one for the drift job having gone stale (nothing pages anyone if the job
+      just stops running silently). Verified firing for real: ran the job against real logged
+      predictions, watched the alert go `Pending` then `Firing` in Grafana after the configured
+      grace period. Notification channels (email/Slack) need real credentials this project
+      doesn't have yet — the rule and its evaluation are real and verified, the "page someone"
+      wiring is a configuration step, not implemented here.
 - [ ] Delayed-label performance job that runs once labels mature
 - [ ] Retraining triggered by drift or schedule, routed through the Phase 3 gate
 

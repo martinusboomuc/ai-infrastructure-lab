@@ -108,6 +108,10 @@ The mechanism really is what was originally planned:
    enough space (`dvc cache dir "$BANKML_DVC_CACHE"` relocates it); the checked-out working files
    are hardlinks from there into `data/` regardless.
 2. `.env` is not auto-loaded by `uv run` — export it first: `set -a && source .env && set +a`.
+   Quote any value containing a `;` (an Azure Storage connection string, for one) — `source`
+   parses `.env` as shell script, and an unquoted `;` ends the statement there, silently
+   truncating everything after it with no error. `AZURE_STORAGE_CONNECTION_STRING='...'`, not
+   `AZURE_STORAGE_CONNECTION_STRING=...`.
 3. Copy `.dvc/config.local` (gitignored, holds the real Azure Storage account key) to the new
    machine separately; it doesn't come from `git clone`.
 4. Run `dvc pull` to rebuild the workspace from the remote.

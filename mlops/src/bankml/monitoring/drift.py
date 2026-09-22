@@ -32,6 +32,7 @@ import argparse
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -255,6 +256,65 @@ def log_drift_run(domain: str, result: dict[str, Any]) -> str:
         return run.info.run_id
 
 
+def push_drift_metrics(domain: str, result: dict[str, Any], pushgateway_url: str) -> None:
+    """Push this run's drift metrics to a Prometheus Pushgateway — the bridge a one-shot batch
+    job needs, since Prometheus's own pull model has nothing to scrape between runs (see
+    infrastructure/homelab/monitoring/docker-compose.yml's comment on the gateway itself).
+
+    A fresh `CollectorRegistry` per call, pushed with `push_to_gateway`'s default replace
+    semantics (not `pushadd_to_gateway`) — every metric this job currently has is included every
+    push, so a feature that stops existing in a later run doesn't linger as a stale value
+    forever; the whole job's metric group is replaced, not merged into.
+
+    `bankml_drift_last_run_timestamp_seconds` exists specifically so an alert rule can check
+    staleness — a Pushgateway metric has no concept of "the job that pushed it stopped running,"
+    it just keeps returning the last-pushed value indefinitely otherwise.
+    """
+    from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+
+    registry = CollectorRegistry()
+    dataset_drift = Gauge(
+        "bankml_drift_dataset_drift",
+        "1 if dataset-level drift was detected on the most recent run, else 0",
+        ["domain", "kind"],
+        registry=registry,
+    )
+    drifted_share = Gauge(
+        "bankml_drift_drifted_share",
+        "Share of compared columns flagged individually drifted",
+        ["domain", "kind"],
+        registry=registry,
+    )
+    feature_psi = Gauge(
+        "bankml_drift_feature_psi",
+        "Per-feature PSI value from the most recent input-drift run",
+        ["domain", "feature"],
+        registry=registry,
+    )
+    last_run_timestamp = Gauge(
+        "bankml_drift_last_run_timestamp_seconds",
+        "Unix timestamp of the most recent successful drift run",
+        ["domain"],
+        registry=registry,
+    )
+
+    dataset_drift.labels(domain=domain, kind="input").set(
+        int(result["input_drift"]["dataset_drift"])
+    )
+    dataset_drift.labels(domain=domain, kind="prediction").set(
+        int(result["prediction_drift"]["dataset_drift"])
+    )
+    drifted_share.labels(domain=domain, kind="input").set(result["input_drift"]["drifted_share"])
+    drifted_share.labels(domain=domain, kind="prediction").set(
+        result["prediction_drift"]["drifted_share"]
+    )
+    for feature, values in result["input_drift"]["features"].items():
+        feature_psi.labels(domain=domain, feature=feature).set(values["psi"])
+    last_run_timestamp.labels(domain=domain).set(time.time())
+
+    push_to_gateway(pushgateway_url, job=f"bankml_drift_{domain}", registry=registry)
+
+
 def main(domain: str = "credit", threshold: float = DEFAULT_PSI_THRESHOLD) -> None:
     result = run_drift_job(domain, threshold=threshold)
     print(json.dumps(result, indent=2, default=str))
@@ -264,6 +324,12 @@ def main(domain: str = "credit", threshold: float = DEFAULT_PSI_THRESHOLD) -> No
 
     run_id = log_drift_run(domain, result)
     print(f"\nLogged drift run {run_id}")
+
+    pushgateway_url = os.environ.get("BANKML_PUSHGATEWAY_URL")
+    if pushgateway_url:
+        push_drift_metrics(domain, result, pushgateway_url)
+        print(f"Pushed metrics to {pushgateway_url}")
+
     if result["input_drift"]["dataset_drift"] or result["prediction_drift"]["dataset_drift"]:
         print("ALERT: drift detected — see logged run for per-feature PSI.")
 
