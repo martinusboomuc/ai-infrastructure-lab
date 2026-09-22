@@ -5,6 +5,7 @@ description = "BankML Platform: a production-inspired MLOps platform for banking
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "dvc[azure]>=3.67.1",
+    "evidently>=0.7.23",
     "fastapi>=0.118.0",
     "lightgbm>=4.7.0",
     "mlflow>=3.16.1",

@@ -131,11 +131,25 @@ merge flow.
       Prometheus on the homelab's `monitoring-01`
       ([infrastructure/homelab/monitoring/README.md](../infrastructure/homelab/monitoring/README.md)).
       Request count (by path, method and status code), request latency and predictions (by
-      domain and decision) all confirmed working against a real local run with a real registered
-      model. The Azure scrape target itself will read `down` until the deployed image is rebuilt
-      and redeployed with this code — Prometheus can't scrape an endpoint that doesn't exist yet
-      on the currently-running revision.
-- [ ] Evidently jobs: input drift, prediction drift, per-feature PSI
+      domain and decision) confirmed working against both a real local run and the live Azure
+      endpoint — the `bankml-credit-serving` Prometheus target reads `up` with real traffic
+      flowing through it.
+- [x] Evidently jobs: input drift, prediction drift, per-feature PSI (`src/bankml/monitoring/drift.py`,
+      `make drift DOMAIN=credit`). Compares the training population (`SPLIT="train"`) against
+      logged production requests (`serving/prediction_log.py`) using per-feature PSI; prediction
+      drift compares the deployed model's score on its own training population against what it
+      has actually predicted for real requests. Logs to its own `<domain>-monitoring` MLflow
+      experiment. Tested against synthetic fixtures with deliberately shifted distributions
+      (`tests/monitoring/test_drift.py`) — the exact exit criterion below — and against real data:
+      a real (tiny, 2-row) local prediction log correctly produced real, very large PSI values,
+      including three real edge cases found doing so (an all-null relational-aggregate column, a
+      string column Evidently's small-sample inference misread as free text, and a boolean column
+      that crashed Evidently's own numeric-stats path) — all now handled explicitly, not by luck.
+      **Known gap, not fixed here**: the deployed Azure Container App's prediction log lives
+      inside the container's own filesystem with no persistent volume — every prediction it
+      serves is lost on restart/redeploy/scale-to-zero, so there's currently no durable log of
+      real production traffic to run this job against in production. A durable sink (Azure Blob,
+      a database) is separate work.
 - [ ] Drift alerting with configured thresholds
 - [ ] Delayed-label performance job that runs once labels mature
 - [ ] Retraining triggered by drift or schedule, routed through the Phase 3 gate
