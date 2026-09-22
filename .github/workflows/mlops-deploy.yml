@@ -12,14 +12,15 @@ name: BankML build, push and deploy
 # A real Container App runs in `spaincentral` (ADR-0012) — westeurope, eastus and francecentral
 # are all disallowed for this resource type on this project's Azure for Students subscription,
 # but the restriction is region-specific, not subscription-wide as ADR-0011 first concluded.
-# The deploy job is skipped, not failed, until three repository secrets exist — added by hand in
-# GitHub repo settings once a shared MLflow backend exists for the deployed container to reach
-# (ROADMAP Phase 4's current gap — the running container can't see the local SQLite registry):
-#   AZURE_CREDENTIALS   — {clientId, clientSecret, subscriptionId, tenantId} for a service
-#                         principal scoped to the resource group (az ad sp create-for-rbac)
-#   RESOURCE_GROUP       — e.g. bankml-rg
-#   CONTAINER_APP_NAME   — e.g. bankml-credit-serving
-# The build+test+push job always runs and gates the merge regardless.
+# The deploy job is real now: three repository secrets are set, a service principal scoped only
+# to `bankml-rg` (az ad sp create-for-rbac --scopes .../resourceGroups/bankml-rg), not the whole
+# subscription:
+#   AZURE_CREDENTIALS   — {clientId, clientSecret, subscriptionId, tenantId}
+#   RESOURCE_GROUP       — bankml-rg
+#   CONTAINER_APP_NAME   — bankml-credit-serving
+# check-azure-credentials still guards the deploy job so the workflow degrades to skip-not-fail
+# if those secrets are ever removed (e.g. rotating the service principal), rather than breaking
+# every merge to main. The build+test+push job always runs and gates the merge regardless.
 
 on:
   push:

@@ -77,7 +77,7 @@ deliberately degraded model is demonstrably rejected by it.
 - [x] Structured logging with request IDs; prediction log persisted
 - [x] Dockerfile; image published to GitHub Container Registry (ADR-0010)
 - [x] Deployed to Azure Container Apps, scale-to-zero — **running**, in `spaincentral` (ADR-0012); Key Vault secrets wired up, self-hosted MLflow reachable through the Cloudflare Tunnel (ADR-0013)
-- [x] CI/CD build+push half working (`mlops-deploy.yml`'s job-level `if:` referencing `secrets` directly was silently rejecting every run for a full day — fixed); deploy half still needs `AZURE_CREDENTIALS` et al. as GitHub secrets
+- [x] CI/CD fully working: build+push, then deploy — `AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` are set as GitHub secrets (a service principal scoped only to `bankml-rg`, not the whole subscription), so a merge to `main` touching `mlops/` now rolls out a real Container Apps revision on its own
 - [x] Prefect introduced for the end-to-end flow
 - [x] Live endpoint serves real scored decisions with reason codes and a model version
 - [ ] `infrastructure/cloud/bankml-teardown.sh` verified to leave zero billable resources
@@ -116,11 +116,11 @@ scored decisions:
  "reason_codes":[{"feature":"EXT_SOURCE_3","shap_value":-0.34710569936954694}, ...]}
 ```
 
-Remaining open item, doesn't block the exit criteria: adding
-`AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME` as GitHub secrets would make
-`mlops-deploy.yml`'s deploy job real (currently skips cleanly without them) — until then, rolling
-out a new revision is done by hand via `infrastructure/cloud/bankml-provision.sh` or a direct
-`az containerapp update --image ...`.
+`mlops-deploy.yml`'s deploy job is now real: `AZURE_CREDENTIALS`/`RESOURCE_GROUP`/`CONTAINER_APP_NAME`
+are set as GitHub secrets, so a merge to `main` touching `mlops/` builds, pushes and rolls out a
+new Container Apps revision with no manual step. `infrastructure/cloud/bankml-provision.sh` and a
+direct `az containerapp update --image ...` still work for one-off rollouts outside the normal
+merge flow.
 
 ---
 
