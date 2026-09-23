@@ -1,0 +1,280 @@
+apiVersion: 1
+
+groups:
+  # Every rule here is multi-dimensional (no `by (role)` grouping written into the PromQL) —
+  # node_exporter and cAdvisor/kube-state-metrics targets already carry `role` (and pod/namespace
+  # for k3s) as a label straight from prometheus.yml's scrape config, so one rule evaluates once
+  # per host/pod and fires one independent alert instance per offender, each templated with its
+  # own {{ $labels.role }} (or {{ $labels.pod }}) — not one alert for "something, somewhere".
+  - orgId: 1
+    name: homelab-infra
+    folder: Homelab
+    interval: 1m
+    rules:
+      - uid: homelab-target-down
+        title: Homelab target down
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # Excludes prometheus (scrapes itself; if it's down, nothing else fires either)
+              # and pushgateway (a one-shot batch job's push target — its own "nobody's pushed
+              # to it" case is already covered by the BankML-drift-job-stale rule, and a
+              # Pushgateway with no active pusher is not itself down).
+              expr: up{job!~"prometheus|pushgateway"}
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: >-
+            {{ $labels.job }} on {{ $labels.role }} has been unreachable for over 2 minutes —
+            Prometheus's last scrape failed. If it's a `node-*` job, the host itself may be down
+            or unreachable (check `tailscale status` and try SSH); if it's `cadvisor` or
+            `kube-state-metrics`, the exporter container/pod likely crashed or was never started;
+            if it's `bankml-credit-serving`, the deployed Container App may have scaled to zero
+            (a cold start can also cause one missed scrape — this only fires after 2 consecutive
+            misses, not one).
+
+      - uid: homelab-cpu-high
+        title: Host CPU usage high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: 100 - (avg by (role) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [90]
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        # 10m, not a short window: a training run or a real burst can legitimately spike CPU for
+        # a minute or two (a ~80% proxmox spike was observed and self-resolved within a few
+        # minutes during Phase 6 work) — this should catch something actually stuck at high load,
+        # not every normal burst.
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            {{ $labels.role }} has been above 90% CPU for over 10 minutes. If it's docker-01,
+            check the "Container CPU usage" panel on the Homelab Overview dashboard for which
+            container is responsible; otherwise SSH in and check `top`/`htop` directly.
+
+      - uid: homelab-memory-high
+        title: Host memory usage high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [90]
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            {{ $labels.role }} has been above 90% memory usage for over 10 minutes. docker-01 and
+            k8s-01 run with 4GB and no swap headroom to spare (see ADR-0014) — this is exactly the
+            precursor to an OOM kill there, not just a number to note. Check the "Container memory
+            usage" panel if it's docker-01, or `sudo k3s kubectl top pods -A` if it's k8s-01.
+
+      - uid: homelab-disk-almost-full
+        title: Host disk almost full
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: >-
+                (1 - (node_filesystem_avail_bytes{mountpoint="/"} /
+                node_filesystem_size_bytes{mountpoint="/"})) * 100
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            {{ $labels.role }}'s root filesystem is over 85% full. docker-01 (40GB) holds the
+            training dataset and DVC cache and is the tightest — check `du -sh` under
+            `~/ai-infrastructure-lab/mlops/data` there first; on any host, `docker system df` and
+            `docker system prune` are the usual first things worth checking for reclaimable space.
+
+  - orgId: 1
+    name: homelab-k3s
+    folder: Homelab
+    interval: 1m
+    rules:
+      - uid: homelab-k3s-pod-not-running
+        title: k3s pod not healthy
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: kube_pod_status_phase{phase=~"Failed|Unknown"} > 0
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in phase
+            {{ $labels.phase }} for over 5 minutes. `sudo k3s kubectl -n {{ $labels.namespace }}
+            describe pod {{ $labels.pod }}` on k8s-01 for the actual reason (Events section at
+            the bottom); `sudo k3s kubectl -n {{ $labels.namespace }} logs {{ $labels.pod }}
+            --previous` if it's crash-looping.
