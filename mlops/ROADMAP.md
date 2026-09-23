@@ -186,7 +186,7 @@ merge flow.
       schedule (no cron/scheduler wired up; `make retrain-on-drift DOMAIN=credit` is run by hand
       or would need one). `bankml.orchestration.flow.drift_check_and_retrain`: runs the same
       drift job `make drift` does, and if either input or prediction drift crossed threshold,
-      retrains through `train_and_evaluate_task` — the same gated path `credit_pipeline` already
+      retrains through `train_and_evaluate_task` — the same gated path `bankml_pipeline` already
       used, evaluate-then-promote-or-not, never a direct promotion. Deliberately retrains against
       the existing feature set rather than rebuilding features from raw data first: this
       project's data is static (ARCHITECTURE.md's known simplifications — no live ingestion), so
@@ -242,10 +242,24 @@ existing domain does. Also found and fixed in the same pass: `training/pipeline.
 a `domain` parameter but silently ignored it, always importing credit's feature module by name —
 a parameter nobody's implementation respected wasn't actually domain-agnostic. Fixed with dynamic
 `importlib.import_module` dispatch; verified behavior-preserving with the full test suite and a
-bit-identical re-run of Credit Risk's training. `bankml.orchestration.flow` still hardcodes credit
-(`credit_pipeline()`, `drift_check_and_retrain(domain: str = "credit")`) — not extended in this
-phase, since Phase 6's "full lifecycle" was scoped to ingestion through registration
-(`bankml.training.pipeline`), not the Prefect orchestration layer.
+bit-identical re-run of Credit Risk's training. `bankml.orchestration.flow` also hardcoded credit
+(`credit_pipeline()`, a module-level `from bankml.features.credit import pipeline`,
+`train_and_evaluate_task` calling `training_pipeline.main(domain="credit")` regardless of its
+caller) — not extended in the original Phase 6 pass, since "full lifecycle" was scoped to
+ingestion through registration (`bankml.training.pipeline`), not the Prefect orchestration layer.
+Generalized in a follow-up pass the same day: every task and flow now takes `domain` explicitly,
+the feature pipeline resolves dynamically the same way `training.pipeline` already does, and the
+flow was renamed `bankml_pipeline`. Verified for real: `bankml_pipeline(domain="fraud")` run
+through Prefect's own task engine (not called directly) produced the same champion/challenger
+metrics and gate outcome as the direct training run above, and the existing mocked wiring tests
+(`tests/orchestration/test_flow.py`, 6 tests) passed unchanged. Also found in the same pass, unrelated to
+orchestration itself but surfaced by re-running `dvc repro`: `__pycache__/` wasn't in
+`.dvcignore`, so a dependency directory's hash (and therefore whether a stage is considered
+"changed") could churn purely from bytecode-cache presence, with no source change at all — fixed,
+and in fixing it found `configs/credit.yaml`'s dependency hash in `dvc.lock` was already stale
+from an earlier, uncommitted-at-the-time edit that had never been re-run through `dvc repro`
+afterward. Both `dvc.lock` entries refreshed and the regenerated Credit Risk features pushed to
+the DVC remote; no code or config changed, only the recorded hashes now match reality.
 
 ---
 
