@@ -69,8 +69,10 @@ use `uv add`.
 
 ## Structure
 
-Domain-specific logic lives in exactly two places: `configs/<domain>.yaml` and
-`src/bankml/features/<domain>/`. Everything else in `src/bankml/` is domain-agnostic.
+Domain-specific logic lives in exactly three places: `configs/<domain>.yaml`,
+`src/bankml/features/<domain>/`, and `src/bankml/validation/<domain>/`. Everything else in
+`src/bankml/` is domain-agnostic. (This file said two places until Phase 6 — Credit Risk's own
+`validation/credit/` was always the third, just never written down here.)
 
 When adding a domain, do not modify core modules. If the core seems to need a change, that is a
 design problem worth surfacing — say so rather than working around it. See
