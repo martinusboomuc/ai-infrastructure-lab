@@ -37,6 +37,25 @@ scrape_configs:
         labels:
           role: proxmox
 
+  # Per-container metrics on docker-01 (infrastructure/homelab/cadvisor/docker-compose.yml) —
+  # the node_exporter jobs above see the host's aggregate CPU/memory/disk, not which container
+  # is actually responsible for it.
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["192.168.1.115:8080"]
+        labels:
+          role: docker-01
+
+  # Pod/deployment-level cluster state on k8s-01 (infrastructure/homelab/k3s/
+  # kube-state-metrics.yaml) — exposed via NodePort 30080 since Prometheus runs outside the k3s
+  # cluster entirely, on a separate VM; the upstream Service is ClusterIP-only and unreachable
+  # from there.
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets: ["192.168.1.183:30080"]
+        labels:
+          role: k8s-01
+
   # The deployed BankML serving app itself, over the public internet — its /metrics endpoint has
   # no authentication of its own (same exposure the app's existing /health and /predict/credit
   # endpoints already have; see infrastructure/homelab/monitoring/README.md's "What's still open").

@@ -1,0 +1,18 @@
+services:
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.60.6
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    # Read-only host mounts cAdvisor needs to see every container's resource usage — it reads
+    # these directly rather than going through the Docker API, which is why it needs host-level
+    # access most containers here never do.
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    privileged: true

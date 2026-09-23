@@ -30,9 +30,11 @@ genuinely public URL, not something inside the LAN. It will read `down` until th
 Container App is rebuilt and redeployed with the `/metrics` route on it; a scale-to-zero cold
 start can also make the very first scrape after idle time-out, which is expected, not a bug.
 
-This covers host-level metrics (all three VMs and the Proxmox host) and BankML's serving app. Not
-yet covered: per-container metrics on `docker-01` (cAdvisor), or k3s/pod-level metrics on
-`k8s-01` (kube-state-metrics).
+This covers host-level metrics (all three VMs and the Proxmox host) and BankML's serving app.
+Two more layers sit on the same dashboard: per-container metrics on `docker-01`
+(`infrastructure/homelab/cadvisor/`, job `cadvisor`) and pod/deployment-level cluster state on
+`k8s-01` (`infrastructure/homelab/k3s/`, job `kube-state-metrics`) — see each directory's own
+README for what it deploys and why.
 
 A Prometheus Pushgateway also runs here (port 9091) — `mlops`'s drift job
 (`mlops/src/bankml/monitoring/drift.py`, `make drift DOMAIN=credit`) is a one-shot batch job, not
@@ -158,8 +160,6 @@ in the UI, if any) — not just stop the containers.
 
 ## What's still open
 
-- Per-container metrics on `docker-01` (cAdvisor) and k3s/pod-level metrics on `k8s-01`
-  (kube-state-metrics).
 - BankML's own drift job (`make drift`, `mlops/src/bankml/monitoring/drift.py`) has real,
   verified-firing Grafana alert rules (`grafana/provisioning/alerting/drift.yaml`) that reach a
   real Discord channel — but nothing else in the stack alerts at all. A host or the serving app

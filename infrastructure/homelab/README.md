@@ -103,8 +103,10 @@ volume, not Azure Blob as that ADR decided.
 
 See [`monitoring/README.md`](monitoring/README.md) — a Docker Compose stack for Prometheus and
 Grafana, scraping `node_exporter` (installed as a systemd service, not a container) on all three
-VMs. Host-level metrics only so far; per-container, per-pod and BankML application metrics are
-still open.
+VMs plus the Proxmox host itself, [`cadvisor/`](cadvisor/README.md) for per-container metrics on
+`docker-01`, [`k3s/`](k3s/README.md) for pod/deployment-level cluster state on `k8s-01`, and
+BankML's deployed serving app directly. Host, container, pod and application metrics are all
+covered now; per-service alerting beyond BankML's own drift job is still open.
 
 ## Tearing down
 

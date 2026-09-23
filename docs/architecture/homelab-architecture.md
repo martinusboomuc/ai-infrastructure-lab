@@ -115,9 +115,11 @@ tables into memory at once) OOM-killing the MLflow container this same VM alread
 `monitoring-01` runs Prometheus and Grafana — see
 [infrastructure/homelab/monitoring/README.md](../../infrastructure/homelab/monitoring/README.md).
 `node_exporter` runs as a systemd service (not a container, since `k8s-01` runs containerd rather
-than Docker) on all three VMs; Prometheus scrapes all three and Grafana renders a provisioned
-"Homelab Overview" dashboard (CPU, memory, disk, network, up/down) per host. Host-level metrics
-only so far — per-container, per-pod and BankML application metrics are still open.
+than Docker) on all three VMs and the Proxmox host itself; Prometheus scrapes all four and
+Grafana renders a provisioned "Homelab Overview" dashboard (CPU, memory, disk, network, up/down)
+per host. cAdvisor adds per-container metrics on `docker-01`, kube-state-metrics adds
+pod/deployment-level cluster state on `k8s-01`, and a second dashboard covers BankML's deployed
+serving app directly — host, container, pod and application layers are all covered now.
 
 All three on the SSD-backed storage pool for their root disks; bulky, non-latency-sensitive data
 (Prometheus's TSDB, container image cache, ISO images) goes on the HDD-backed pool instead. No
