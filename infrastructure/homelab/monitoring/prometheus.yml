@@ -27,6 +27,16 @@ scrape_configs:
         labels:
           role: monitoring-01
 
+  # The Proxmox host itself (pve01) — everything else in the homelab runs on top of it, so it's
+  # the single most consequential machine to have visibility into, not an afterthought. Reached
+  # over its Tailscale address (100.115.148.123), not the LAN, since monitoring-01 has no other
+  # documented route to it that isn't also the LAN IP a DHCP renewal could change under it.
+  - job_name: node-proxmox
+    static_configs:
+      - targets: ["100.115.148.123:9100"]
+        labels:
+          role: proxmox
+
   # The deployed BankML serving app itself, over the public internet — its /metrics endpoint has
   # no authentication of its own (same exposure the app's existing /health and /predict/credit
   # endpoints already have; see infrastructure/homelab/monitoring/README.md's "What's still open").

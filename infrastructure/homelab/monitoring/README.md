@@ -7,11 +7,19 @@ Docker Compose stack for the homelab's own monitoring, per
 ## Current state
 
 `node_exporter` runs as a systemd service directly on all three VMs (`k8s-01`, `docker-01`,
-`monitoring-01`) — a static binary, not a container, since `k8s-01` runs containerd rather than
-Docker and a systemd service is the one deployment method that works identically on all three.
-Prometheus (on `monitoring-01`) scrapes all three over the LAN and Grafana visualises them
-through a provisioned "Homelab Overview" dashboard: CPU, memory, disk and network per host, plus
-an up/down panel.
+`monitoring-01`) and on the Proxmox host itself (`pve01`) — a static binary, not a container,
+since `k8s-01` runs containerd rather than Docker and a systemd service is the one deployment
+method that works identically everywhere, hypervisor included. Prometheus (on `monitoring-01`)
+scrapes the three VMs over the LAN and the Proxmox host over its Tailscale address (no other
+documented route to it that isn't a LAN IP a DHCP renewal could change under it), and Grafana
+visualises all four through the same provisioned "Homelab Overview" dashboard: CPU, memory, disk
+and network per host, plus an up/down panel. Every panel is queried by the generic `role` label
+each scrape job sets, not hardcoded per host — the Proxmox host required a new scrape target in
+`prometheus.yml` and nothing else; the dashboard picked it up automatically.
+
+The Proxmox host is arguably the single most consequential machine to have visibility into —
+every VM here runs on top of it — so it not being monitored was a real gap, not a deliberate
+simplification, closed once it was noticed rather than left for later.
 
 Prometheus also scrapes BankML's deployed serving app directly over the public internet
 (`GET https://bankml-credit-serving.../metrics`, see `mlops/src/bankml/serving/metrics.py`), and
@@ -22,8 +30,9 @@ genuinely public URL, not something inside the LAN. It will read `down` until th
 Container App is rebuilt and redeployed with the `/metrics` route on it; a scale-to-zero cold
 start can also make the very first scrape after idle time-out, which is expected, not a bug.
 
-This covers host-level metrics and BankML's serving app. Not yet covered: per-container metrics
-on `docker-01` (cAdvisor), or k3s/pod-level metrics on `k8s-01` (kube-state-metrics).
+This covers host-level metrics (all three VMs and the Proxmox host) and BankML's serving app. Not
+yet covered: per-container metrics on `docker-01` (cAdvisor), or k3s/pod-level metrics on
+`k8s-01` (kube-state-metrics).
 
 A Prometheus Pushgateway also runs here (port 9091) — `mlops`'s drift job
 (`mlops/src/bankml/monitoring/drift.py`, `make drift DOMAIN=credit`) is a one-shot batch job, not
@@ -63,7 +72,7 @@ in Grafana's own database volume; this is the one-time setup for a genuinely fre
 
 ## Deploying
 
-`node_exporter` first, on each of the three VMs, over SSH:
+`node_exporter` first, on each of the three VMs **and on the Proxmox host itself**, over SSH:
 
 ```bash
 curl -sL -o node_exporter.tar.gz \
@@ -89,6 +98,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now node_exporter
 rm -rf node_exporter.tar.gz node_exporter-1.8.2.linux-amd64
 ```
+
+On the Proxmox host (`root@100.115.148.123`), drop every `sudo` — Proxmox doesn't provision a
+separate sudo user by default, so this runs directly as `root`.
 
 Then the stack itself, on `monitoring-01`:
 
