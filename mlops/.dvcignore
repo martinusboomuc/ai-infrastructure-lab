@@ -1,3 +1,9 @@
 # Add patterns of files dvc should ignore, which could improve
 # the performance. Learn more at
 # https://dvc.org/doc/user-guide/dvcignore
+
+# Without this, a dependency directory's dvc.lock hash (e.g. features_fraud's dependency on
+# src/bankml/features/fraud) churns purely from bytecode-cache presence/absence between runs —
+# found by re-running `dvc repro` twice with no source change and getting two different hashes.
+__pycache__/
+*.pyc
