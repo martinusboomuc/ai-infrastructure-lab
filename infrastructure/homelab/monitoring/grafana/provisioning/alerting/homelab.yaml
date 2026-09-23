@@ -282,11 +282,14 @@ groups:
         labels:
           severity: warning
         annotations:
+          # A bare {{ $labels.phase }} renders the literal string "[no value]" when the label
+          # is absent (confirmed for real — the first live fire of this rule showed exactly that
+          # for the waiting-reason branch, which carries no `phase` label at all), not an empty
+          # string — hence the explicit if/else rather than blind concatenation.
           summary: >-
             Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been unhealthy for
-            over 5 minutes (phase {{ $labels.phase }}{{ $labels.reason }} — one of the two fields
-            is empty depending on which condition matched: a terminal pod phase, or a container
-            stuck waiting on a bad image / crash-looping). `sudo k3s kubectl -n
-            {{ $labels.namespace }} describe pod {{ $labels.pod }}` on k8s-01 for the actual
-            reason (Events section at the bottom); `sudo k3s kubectl -n {{ $labels.namespace }}
-            logs {{ $labels.pod }} --previous` if it's crash-looping.
+            over 5 minutes
+            ({{ if $labels.phase }}phase {{ $labels.phase }}{{ else }}{{ $labels.reason }}{{ end }}).
+            `sudo k3s kubectl -n {{ $labels.namespace }} describe pod {{ $labels.pod }}` on
+            k8s-01 for the actual reason (Events section at the bottom); `sudo k3s kubectl -n
+            {{ $labels.namespace }} logs {{ $labels.pod }} --previous` if it's crash-looping.
