@@ -37,6 +37,16 @@ def compute_reason_codes(
         # LightGBM's sklearn API can return a single array (binary) or a list per class.
         shap_values = raw_shap[1] if isinstance(raw_shap, list) else raw_shap
         feature_names = list(sample.columns)
+    elif model_type == "logistic_regression":
+        # model is the Pipeline from training/logistic.py — SHAP needs the fitted linear model
+        # and a background/explain set in the *same already-encoded* numeric space, not the
+        # raw pre-preprocessing columns LinearExplainer would otherwise see.
+        preprocessor = model.named_steps["preprocess"]
+        linear_model = model.named_steps["logistic_regression"]
+        X_encoded = preprocessor.transform(sample)
+        explainer = shap.LinearExplainer(linear_model, X_encoded)
+        shap_values = explainer.shap_values(X_encoded)
+        feature_names = list(preprocessor.get_feature_names_out())
     else:
         raise ValueError(f"no SHAP explainer configured for model type: {model_type!r}")
 

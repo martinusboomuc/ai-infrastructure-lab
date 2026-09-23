@@ -1,17 +1,31 @@
 """Champion/challenger training + evaluation orchestration.
 
 Domain-agnostic (ADR-0002): which model type is champion/challenger comes entirely from a
-domain's config (e.g. configs/credit.yaml's `modelling` section). This is the one place the
-temporal-split discipline (fit only on train) and the fair-lending exclusion (never train on a
-protected attribute) are enforced — individual model-fitting functions have no split or
-column-sensitivity awareness of their own, by design.
+domain's config (e.g. configs/credit.yaml's `modelling` section), and which feature-preparation
+functions apply comes from `bankml.features.<domain>.prepare`, resolved dynamically at call time
+(`_load_prepare_module`) rather than imported by name — the actual bug Phase 6 found: this
+module already took `domain` as a parameter, but silently always used credit's feature module
+regardless, because the import at the top of the file was hardcoded. A parameter nobody's
+implementation actually respects isn't domain-agnostic, just domain-agnostic-shaped.
+
+This is the one place the temporal-split discipline (fit only on train) and the fair-lending
+exclusion (never train on a protected attribute) are enforced — individual model-fitting
+functions have no split or column-sensitivity awareness of their own, by design.
+
+Every domain's `features/<domain>/prepare.py` must expose exactly three names for this to work:
+`feature_columns`, `capture_categories`, `prepare_features` — the same three credit's already
+does. This is the real, load-bearing interface contract between the core and a domain's feature
+module; nothing enforces it beyond this docstring and an `ImportError`/`AttributeError` at
+runtime if a domain's module doesn't match it.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 from pathlib import Path
+from types import ModuleType
 
 import pandas as pd
 import yaml
@@ -19,33 +33,36 @@ import yaml
 from bankml.evaluation.explain import compute_reason_codes
 from bankml.evaluation.metrics import compute_metrics
 from bankml.evaluation.slices import compute_slice_metrics
-from bankml.features.credit.prepare import capture_categories
-from bankml.features.credit.prepare import feature_columns as _feature_columns
-from bankml.features.credit.prepare import prepare_features as _prepare_features
 from bankml.registry.gate import evaluate_gate
 from bankml.registry.model_card import generate_model_card
 from bankml.registry.promote import promote_to_production
 from bankml.tracking import log_run
 from bankml.training.gbm import fit_lightgbm
+from bankml.training.logistic import fit_logistic_regression
 from bankml.training.scorecard import fit_scorecard
 
 
-def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
+def _load_prepare_module(domain: str) -> ModuleType:
+    return importlib.import_module(f"bankml.features.{domain}.prepare")
+
+
+def train_and_evaluate(features_df: pd.DataFrame, config: dict, domain: str) -> dict:
     """Fit champion and challenger per `config["modelling"]`, score every split, and return
     fitted models plus metrics/slice-metrics per role per split.
 
     An immature row's label isn't trustworthy for evaluation, not just training (ADR-0004), so
     every split here is drawn only from `IS_MATURE == True` rows.
     """
+    prepare = _load_prepare_module(domain)
     mature = features_df[features_df["IS_MATURE"]].copy()
-    feature_columns = _feature_columns(mature)
+    feature_columns = prepare.feature_columns(mature)
     categorical_columns = (
         mature[feature_columns].select_dtypes(include=["object", "str"]).columns.tolist()
     )
     # Captured once from every mature row (not per-split) and reused everywhere `prepare_features`
     # is called below, so training, evaluation and serving all encode categoricals identically —
     # see capture_categories's docstring for the bug this fixes.
-    categories = capture_categories(mature, feature_columns)
+    categories = prepare.capture_categories(mature, feature_columns)
 
     splits = {
         name: mature[mature["SPLIT"] == name]
@@ -53,7 +70,7 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
         if (mature["SPLIT"] == name).any()
     }
     train_df = splits["train"]
-    X_train = _prepare_features(train_df, feature_columns, categories=categories)
+    X_train = prepare.prepare_features(train_df, feature_columns, categories=categories)
     y_train = train_df["TARGET"]
 
     results: dict = {"models": {}, "metrics": {}, "slice_metrics": {}, "reason_codes": {}}
@@ -64,6 +81,8 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
             model = fit_scorecard(X_train, y_train, categorical_variables=categorical_columns)
         elif model_type == "lightgbm":
             model = fit_lightgbm(X_train, y_train)
+        elif model_type == "logistic_regression":
+            model = fit_logistic_regression(X_train, y_train)
         else:
             raise ValueError(f"unknown model type in modelling config: {model_type!r}")
 
@@ -72,7 +91,7 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
         results["slice_metrics"][role] = {}
 
         for split_name, split_df in splits.items():
-            X_split = _prepare_features(split_df, feature_columns, categories=categories)
+            X_split = prepare.prepare_features(split_df, feature_columns, categories=categories)
             y_split = split_df["TARGET"]
             y_score = model.predict_proba(X_split)[:, 1]
 
@@ -84,7 +103,7 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict) -> dict:
             )
 
         explain_split = splits.get("test", train_df)
-        X_explain = _prepare_features(explain_split, feature_columns, categories=categories)
+        X_explain = prepare.prepare_features(explain_split, feature_columns, categories=categories)
         results["reason_codes"][role] = compute_reason_codes(model, model_type, X_explain)
 
     results["categories"] = categories
@@ -120,7 +139,7 @@ def main(domain: str = "credit") -> None:
     features_path = data_root / "processed" / domain / "features.parquet"
     features_df = pd.read_parquet(features_path)
 
-    results = train_and_evaluate(features_df, config)
+    results = train_and_evaluate(features_df, config, domain)
     _print_report(results, config)
 
     for role in ("champion", "challenger"):
