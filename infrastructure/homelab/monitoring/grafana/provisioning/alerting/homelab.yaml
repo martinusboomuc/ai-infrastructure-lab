@@ -239,7 +239,17 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: kube_pod_status_phase{phase=~"Failed|Unknown"} > 0
+              # phase=~"Failed|Unknown" alone misses the two most common real failure modes —
+              # verified by actually triggering it: a pod stuck on a bad image (ImagePullBackOff/
+              # ErrImagePull) stays in `Pending` phase indefinitely, and a crash-looping container
+              # (CrashLoopBackOff) keeps its pod in `Running` phase throughout. Neither is "Failed"
+              # or "Unknown" — Kubernetes only uses those two for a pod whose containers have all
+              # already terminated and won't be retried. The waiting-reason check below is what
+              # actually catches both real cases; the phase check stays for genuine terminal
+              # failures (an evicted pod, a Job that exhausted its retries).
+              expr: >-
+                (kube_pod_status_phase{phase=~"Failed|Unknown"} > 0) or
+                (kube_pod_container_status_waiting_reason{reason=~"ImagePullBackOff|ErrImagePull|CrashLoopBackOff|CreateContainerConfigError|InvalidImageName"} > 0)
               instant: false
               range: true
               refId: A
@@ -273,8 +283,10 @@ groups:
           severity: warning
         annotations:
           summary: >-
-            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in phase
-            {{ $labels.phase }} for over 5 minutes. `sudo k3s kubectl -n {{ $labels.namespace }}
-            describe pod {{ $labels.pod }}` on k8s-01 for the actual reason (Events section at
-            the bottom); `sudo k3s kubectl -n {{ $labels.namespace }} logs {{ $labels.pod }}
-            --previous` if it's crash-looping.
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been unhealthy for
+            over 5 minutes (phase {{ $labels.phase }}{{ $labels.reason }} — one of the two fields
+            is empty depending on which condition matched: a terminal pod phase, or a container
+            stuck waiting on a bad image / crash-looping). `sudo k3s kubectl -n
+            {{ $labels.namespace }} describe pod {{ $labels.pod }}` on k8s-01 for the actual
+            reason (Events section at the bottom); `sudo k3s kubectl -n {{ $labels.namespace }}
+            logs {{ $labels.pod }} --previous` if it's crash-looping.
