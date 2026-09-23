@@ -206,12 +206,18 @@ in the UI, if any) — not just stop the containers.
 
 ## What's still open
 
-- BankML's own drift job (`make drift`, `mlops/src/bankml/monitoring/drift.py`) has real,
-  verified-firing Grafana alert rules (`grafana/provisioning/alerting/drift.yaml`) that reach a
-  real Discord channel — but nothing else in the stack alerts at all. A host or the serving app
-  itself going down still pages no one; only drift detection does right now.
 - The BankML scrape target is a hardcoded Azure FQDN in `prometheus.yml`, not derived from
   anything — if the Container App is ever recreated with a different auto-generated hostname
   segment, this needs a manual update.
 - `node_exporter`'s IP-based scrape targets in `prometheus.yml` are DHCP leases, not static
   reservations, same caveat as `docs/architecture/homelab-architecture.md`'s VM layout table.
+- **Known Grafana limitation, not ours to fix:** a "Resolved" Discord notification can show the
+  raw, unrendered `{{ $labels.x }}` template instead of real values, if a Grafana restart happens
+  while that specific alert is actively firing — annotations aren't persisted across a restart,
+  only the raw template is, so the later resolve notification has nothing rendered to send.
+  Confirmed as an open upstream bug,
+  [grafana/grafana#114973](https://github.com/grafana/grafana/issues/114973), not something in
+  this repo's rule config — the **Firing** notification (the one that actually matters when
+  responding to a real problem) always renders correctly; only a resolve notification sent across
+  a restart is affected, and restarting Grafana mid-incident is inherently rare in normal
+  operation.
