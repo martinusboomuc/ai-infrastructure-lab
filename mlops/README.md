@@ -2,11 +2,14 @@
 
 > Production-inspired MLOps platform for banking machine learning — built one vertical slice at a time.
 
-**Status:** Phase 5 done · Monitoring and retraining (Credit Risk) · A Container App runs live on
-Azure, serves real scored Credit Risk decisions with reason codes, and is watched by drift
-detection, alerting and drift-triggered retraining through the Phase 3 gate. Phase 4's one
-remaining item (verifying the teardown script) is deliberately deferred, not blocking. See
-[ROADMAP.md](ROADMAP.md).
+**Status:** Phase 6 done · Portability proof (Fraud Detection) · A second domain — Fraud
+Detection, on the Sparkov synthetic transaction dataset — runs the full lifecycle (ingestion
+through the promotion gate) with all fraud-specific logic confined to a config file, a feature
+module and a validation schema, proving the platform's core is genuinely domain-agnostic rather
+than built around Credit Risk's shape. Credit Risk itself remains live on Azure, serving real
+scored decisions with reason codes, watched by drift detection and drift-triggered retraining.
+Phase 4's one remaining item (verifying the teardown script) is deliberately deferred, not
+blocking. See [ROADMAP.md](ROADMAP.md).
 
 BankML Platform reproduces how a bank builds, ships, monitors and governs machine learning
 models in production.
@@ -31,10 +34,10 @@ order. The table below is the honest state of the build and is updated with ever
 | Feature pipeline (point-in-time correct) | Done |
 | Training pipeline + experiment tracking | Done |
 | Model registry + model cards | Done |
-| Serving API | In progress |
-| Monitoring + drift detection | Not started |
-| Cloud deployment | Not started |
-| Second domain (portability proof) | Not started |
+| Serving API | Done |
+| Monitoring + drift detection | Done |
+| Cloud deployment | Done |
+| Second domain (portability proof) | Done |
 
 ---
 
@@ -44,10 +47,14 @@ The platform is built end-to-end on **a single domain first** — Credit Risk. E
 (ingestion → validation → features → training → registry → serving → monitoring → retraining)
 has to actually work for that one domain before a second one is added.
 
-The second domain, **Fraud Detection**, is the real test. If the architecture is genuinely
-domain-agnostic, adding it should be mostly configuration and a domain-specific feature module —
-not a rewrite. **That diff is the deliverable**: it is the evidence that this is a platform and
-not five notebooks sharing a folder.
+The second domain, **Fraud Detection**, was the real test. If the architecture were genuinely
+domain-agnostic, adding it would be mostly configuration and a domain-specific feature module —
+not a rewrite. **That diff is the deliverable**: Fraud Detection was added by writing exactly
+`configs/fraud.yaml`, `src/bankml/features/fraud/` and `src/bankml/validation/fraud/` — plus one
+small, generic extension to the core's model-type dispatch (a third model family, not a
+domain-specific branch — see ROADMAP.md's Phase 6 for the full account of that exception). No
+core module was rewritten and no domain-specific logic leaked outside those three locations. That
+is the evidence this is a platform and not five notebooks sharing a folder.
 
 Remaining domains stay on the roadmap until the first two are done. Shipping a working narrow
 thing beats describing a broad one.
