@@ -1,0 +1,65 @@
+# Fraud Detection domain config.
+
+domain: fraud
+
+# Each transaction is its own decision point (contrast Credit Risk, where entity_key and the
+# relational-history grouping key are the same column, SK_ID_CURR). Here they differ on purpose:
+# trans_num identifies the row being scored; cc_num (below) is the customer/card whose own past
+# transactions the velocity/geo/recency features are computed from.
+entity_key: trans_num
+target: TARGET
+
+raw_data:
+  directory: raw/fraud/ # under $BANKML_DATA_ROOT
+  tables:
+    - fraudTrain.csv
+    - fraudTest.csv
+
+# Sparkov has real timestamps (trans_date_trans_time) — unlike Credit Risk, no synthetic anchor
+# (ADR-0008) is needed. The two raw files are concatenated and re-split chronologically below;
+# Sparkov's own train/test division is not used as given (docs/datasets/README.md), since it
+# isn't drawn along a decision-relevant boundary — it is simply where the generator stopped.
+split:
+  train:
+    from: 2019-01-01
+    to: 2020-02-29
+  gap_days: 14
+  validation:
+    from: 2020-03-14
+    to: 2020-06-30
+  test:
+    from: 2020-07-01
+    to: 2020-12-31
+
+# A fraud/chargeback determination resolves in days to a few weeks, not the months a credit
+# default takes (contrast credit.yaml's 540-day window) — 7 days is a provisional, illustrative
+# floor, not a real card network's dispute-window figure. as_of is one day past the dataset's
+# last transaction (2020-12-31), matching credit.yaml's own reasoning: evaluation happens after
+# data collection stopped, so as_of is modeled as meaningfully later than the data itself.
+label:
+  maturity_days: 7
+  as_of: 2021-01-01
+
+# ADR-0005 extended (Phase 6): reversed from Credit Risk. LightGBM is champion for Fraud
+# (extreme class imbalance, no adverse-action requirement); logistic_regression is challenger —
+# a plain, un-binned logistic regression (src/bankml/training/logistic.py), not the WoE scorecard
+# credit.yaml's champion uses; that technique is specifically for scorecard-style explainability
+# and isn't a fraud-modelling convention.
+modelling:
+  champion: lightgbm
+  challenger: logistic_regression
+
+# ARCHITECTURE.md Section 5: fraud's threshold is driven entirely by the alert budget, not a
+# fixed FPR target — a fraud review queue has a fixed daily headcount, not a fixed false-positive
+# tolerance. cost_of_miss/cost_of_review are illustrative, same caveat as credit.yaml's.
+evaluation:
+  cost_of_miss: 50 # cost units, missing an actual fraudulent transaction
+  cost_of_review: 1 # cost units, reviewing a false positive
+  target_fpr: 0.01
+  alert_budget_fraction: 0.01 # top 1% by risk score - review-queue capacity, not a slice tolerance
+  slices:
+    - column: category
+      tolerance: 0.05 # max allowed PR-AUC drop on any slice value vs. overall
+  # Promotion gate (same mechanism as credit.yaml). Provisional floor.
+  gate:
+    min_pr_auc: 0.20

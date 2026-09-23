@@ -9,3 +9,13 @@ stages:
       - data/raw/credit
     outs:
       - data/processed/credit/features.parquet
+  features_fraud:
+    cmd: uv run python -m bankml.features.fraud.pipeline
+    deps:
+      - src/bankml/features/fraud
+      - src/bankml/splitting.py
+      - src/bankml/validation/fraud
+      - configs/fraud.yaml
+      - data/raw/fraud
+    outs:
+      - data/processed/fraud/features.parquet

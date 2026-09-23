@@ -31,3 +31,34 @@ stages:
       hash: md5
       md5: 8abba1fe6ddf0a0faae42f31817fa84b
       size: 19179979
+  features_fraud:
+    cmd: uv run python -m bankml.features.fraud.pipeline
+    deps:
+    - path: configs/fraud.yaml
+      hash: md5
+      md5: bc6bca1c7443e506771f4d29b119520b
+      size: 2877
+    - path: data/raw/fraud
+      hash: md5
+      md5: 0f2ff942d8a7c0790dc01705ee1419b6.dir
+      size: 501592732
+      nfiles: 4
+    - path: src/bankml/features/fraud
+      hash: md5
+      md5: 061a06e7e52e26c6063c7e153136d49a.dir
+      size: 22429
+      nfiles: 7
+    - path: src/bankml/splitting.py
+      hash: md5
+      md5: 4fb29d7600301e3fe48628770f472447
+      size: 2983
+    - path: src/bankml/validation/fraud
+      hash: md5
+      md5: 3e5e08429db56f21b3ce2e5c22194e68.dir
+      size: 5386
+      nfiles: 4
+    outs:
+    - path: data/processed/fraud/features.parquet
+      hash: md5
+      md5: 7f9e43dfec6c27187c5f58742ec783d8
+      size: 154709008
