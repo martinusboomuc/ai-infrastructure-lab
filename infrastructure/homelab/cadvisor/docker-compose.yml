@@ -1,6 +1,9 @@
 services:
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.60.6
+    # ghcr.io, not gcr.io/cadvisor: the image registry moved at v0.53.0, and gcr.io/cadvisor only
+    # ever published tags before that — found by the actual pull failing on docker-01, not by
+    # reading the manifest list in advance.
+    image: ghcr.io/google/cadvisor:v0.60.6
     restart: unless-stopped
     ports:
       - "8080:8080"
