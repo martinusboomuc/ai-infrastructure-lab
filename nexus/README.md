@@ -31,7 +31,7 @@ The backend holds no state of its own — every response is computed fresh from 
 Grafana already reads (the exact same PromQL, so a number here never disagrees with what Grafana
 shows), so it can be restarted or redeployed with nothing to lose.
 
-## Running locally
+## Running locally (dev servers, hot reload)
 
 ```bash
 cd backend && uv sync && uv run uvicorn app.main:app --port 8000
@@ -39,6 +39,20 @@ cd frontend && npm install && npm run dev
 ```
 
 The frontend reads `VITE_API_BASE` (default `http://localhost:8000`) — see `frontend/.env.example`.
+
+## Deploying
+
+```bash
+cd nexus
+docker compose up -d --build
+```
+
+Builds and runs both services: the backend on `:8000`, the frontend (a static build served by
+nginx) on `:8080`. `VITE_API_BASE` is baked into the frontend's built JS at image-build time (a
+browser loading a static file can't resolve a Docker-internal container name), defaulting to
+`docker-01`'s own LAN address — override it in a `.env` file if deploying elsewhere. Requires
+`/var/run/tailscale/tailscaled.sock` to exist on the host running this (i.e., a host that's
+already joined the tailnet) — see `backend/app/tailscale.py`'s docstring.
 
 ## Roadmap
 

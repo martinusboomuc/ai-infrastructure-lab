@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://192.168.1.136:9090}
+    volumes:
+      # The host's real tailscaled socket — backend/app/tailscale.py's `tailscale status --json`
+      # talks to this directly, so presence reflects docker-01's own actual tailnet view, not a
+      # separate in-container Tailscale identity that would need its own auth key.
+      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the built JS at image-build time — the browser loading this page needs a
+        # real, network-routable address for the backend, not a Docker-internal container name
+        # it can't resolve. LAN IP for now; revisit once this is routed through the Cloudflare
+        # Tunnel domain, where the API can live on the same hostname instead.
+        VITE_API_BASE: ${VITE_API_BASE:-http://192.168.1.115:8000}
+    restart: unless-stopped
+    ports:
+      - "8080:80"
