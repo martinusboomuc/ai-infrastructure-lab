@@ -23,4 +23,6 @@ services:
         VITE_API_BASE: ${VITE_API_BASE:-http://192.168.1.115:8000}
     restart: unless-stopped
     ports:
-      - "8080:80"
+      # 8080 is already cAdvisor's port on this host (infrastructure/homelab/cadvisor/) — found
+      # the hard way, by silently hitting cAdvisor's own web UI instead of this frontend.
+      - "8081:80"

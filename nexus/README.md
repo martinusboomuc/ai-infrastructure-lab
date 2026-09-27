@@ -48,7 +48,7 @@ docker compose up -d --build
 ```
 
 Builds and runs both services: the backend on `:8000`, the frontend (a static build served by
-nginx) on `:8080`. `VITE_API_BASE` is baked into the frontend's built JS at image-build time (a
+nginx) on `:8081`. `VITE_API_BASE` is baked into the frontend's built JS at image-build time (a
 browser loading a static file can't resolve a Docker-internal container name), defaulting to
 `docker-01`'s own LAN address — override it in a `.env` file if deploying elsewhere. Requires
 `/var/run/tailscale/tailscaled.sock` to exist on the host running this (i.e., a host that's
