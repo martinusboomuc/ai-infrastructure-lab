@@ -8,9 +8,8 @@ system actually look like, and what's running where" — a designed, explorable 
 underlying data (Tailscale presence, Prometheus health, eventually MLflow's model registry and
 BankML's feature metadata), not another set of generic metric panels.
 
-**Status:** Phase 1 (topology + presence) — working, verified against real live infrastructure,
-not yet deployed off the developer's own machine. See `infrastructure/homelab/monitoring/` for
-the Grafana/Prometheus stack this reads from.
+**Status:** Phase 1 (topology + presence) — deployed and live on `docker-01`. See
+`infrastructure/homelab/monitoring/` for the Grafana/Prometheus stack this reads from.
 
 ## Why a separate app, not another Grafana dashboard
 
@@ -38,7 +37,12 @@ cd backend && uv sync && uv run uvicorn app.main:app --port 8000
 cd frontend && npm install && npm run dev
 ```
 
-The frontend reads `VITE_API_BASE` (default `http://localhost:8000`) — see `frontend/.env.example`.
+The frontend's own code only ever calls a relative `/api/...` path — Vite's dev server proxies
+that to the backend on `:8000` (`vite.config.ts`), the same way nginx does in production
+(`frontend/nginx.conf`). No IP address or hostname is ever baked into the frontend at all, in
+either environment — found the hard way once already: an earlier version baked in a specific
+address at build time, which worked from the LAN and silently failed once the page was loaded
+from anywhere else.
 
 ## Deploying
 
@@ -47,19 +51,18 @@ cd nexus
 docker compose up -d --build
 ```
 
-Builds and runs both services: the backend on `:8000`, the frontend (a static build served by
-nginx) on `:8081`. `VITE_API_BASE` is baked into the frontend's built JS at image-build time (a
-browser loading a static file can't resolve a Docker-internal container name), defaulting to
-`docker-01`'s own LAN address — override it in a `.env` file if deploying elsewhere. Requires
-`/var/run/tailscale/tailscaled.sock` to exist on the host running this (i.e., a host that's
-already joined the tailnet) — see `backend/app/tailscale.py`'s docstring.
+Builds and runs both services on `docker-01`: the backend has no published port at all (nginx
+reverse-proxies `/api/` to it internally, by Compose service name — nothing external needs to
+reach it directly), the frontend (a static build served by nginx) is published on `:8081`.
+Requires `/var/run/tailscale/tailscaled.sock` to exist on the host running this (i.e., a host
+that's already joined the tailnet) — see `backend/app/tailscale.py`'s docstring.
 
 ## Roadmap
 
 1. **Topology + presence** (done) — live node graph: the Proxmox host, its three VMs, and
    personal devices (MacBook, iPhone) shown only while actually connected to the tailnet.
-2. **Deployment** — containerized and running on `docker-01` alongside MLflow and monitoring,
-   reachable at its own subdomain through the existing Cloudflare Tunnel.
+2. **Deployment** (done) — containerized and running on `docker-01` alongside MLflow and
+   monitoring. Not yet reachable at its own subdomain through the existing Cloudflare Tunnel.
 3. **Quick-launch per node** — click a node, get its live detail plus direct links out to the
    real tool it represents (Grafana's dashboard, Prometheus, MLflow, the Discord alert channels).
 4. **MLflow and feature browsing** — select a registered model, see its real metrics, model card,
