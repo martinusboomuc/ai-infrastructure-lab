@@ -1,0 +1,13 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://192.168.1.136:9090}
+    volumes:
+      # The host's real tailscaled socket — app/tailscale.py's `tailscale status --json` talks
+      # to this directly, so presence reflects docker-01's own actual tailnet view, not a
+      # separate in-container Tailscale identity that would need its own auth key.
+      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock

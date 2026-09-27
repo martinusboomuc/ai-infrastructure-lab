@@ -23,6 +23,7 @@ containers/
 automation/
 monitoring/
 mlops/
+nexus/
 scripts/
 assets/
 ```
@@ -43,6 +44,12 @@ banking machine learning, with its own architecture, roadmap and architecture de
 
 It is the largest project in this lab and is developed as a standalone product — see
 [`mlops/README.md`](mlops/README.md).
+
+## Nexus
+
+[**`nexus/`**](nexus/) is a live, visual command center for the homelab — infrastructure topology
+today, MLflow model and feature browsing next, a local-LLM copilot last. Also developed as a
+standalone product — see [`nexus/README.md`](nexus/README.md).
 
 ## Technology Stack
 

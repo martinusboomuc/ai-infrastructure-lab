@@ -1,0 +1,137 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #1e293b;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.app-subtitle {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.graph-container {
+  flex: 1;
+}
+
+.graph-error {
+  padding: 24px;
+  color: #f87171;
+  font-size: 14px;
+}
+
+.graph-loading {
+  padding: 24px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.homelab-node {
+  min-width: 160px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  transition: border-color 0.2s;
+}
+
+.homelab-node.online {
+  border-color: #2563eb;
+}
+
+.homelab-node.offline {
+  opacity: 0.5;
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.node-icon {
+  font-size: 16px;
+}
+
+.node-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.up {
+  background: #4ade80;
+  box-shadow: 0 0 6px #4ade80;
+}
+
+.status-dot.down {
+  background: #64748b;
+}
+
+.node-ip {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+  font-family: ui-monospace, monospace;
+}
+
+.node-health {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.health-label {
+  font-size: 9px;
+  color: #64748b;
+  width: 24px;
+}
+
+.health-track {
+  flex: 1;
+  height: 4px;
+  background: #334155;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.health-fill {
+  height: 100%;
+  transition: width 0.4s;
+}
+
+.health-pct {
+  font-size: 9px;
+  color: #94a3b8;
+  width: 28px;
+  text-align: right;
+}
