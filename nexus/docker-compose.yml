@@ -18,9 +18,13 @@ services:
       args:
         # Baked into the built JS at image-build time — the browser loading this page needs a
         # real, network-routable address for the backend, not a Docker-internal container name
-        # it can't resolve. LAN IP for now; revisit once this is routed through the Cloudflare
+        # it can't resolve. docker-01's Tailscale IP, not its LAN IP: a LAN IP only resolves for
+        # a browser on the same home network, but the whole point of putting every homelab
+        # machine on the tailnet is reachability from anywhere — confirmed the hard way, the
+        # frontend loaded fine over Tailscale from off-LAN but its own data fetch to a LAN-only
+        # backend address silently failed. Revisit once this is routed through the Cloudflare
         # Tunnel domain, where the API can live on the same hostname instead.
-        VITE_API_BASE: ${VITE_API_BASE:-http://192.168.1.115:8000}
+        VITE_API_BASE: ${VITE_API_BASE:-http://100.127.8.10:8000}
     restart: unless-stopped
     ports:
       # 8080 is already cAdvisor's port on this host (infrastructure/homelab/cadvisor/) — found
