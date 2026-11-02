@@ -8,7 +8,21 @@ full topology. Sections marked TBD are genuinely undecided, not omitted by accid
 ## Today
 
 - MacBook and the homelab Proxmox host are on the same local network.
-- Wake-on-LAN is configured and working from the MacBook to the homelab host.
+- **Wake-on-LAN** is configured and working from the MacBook to the Proxmox host (`pve01`,
+  `192.168.1.10`). The magic-packet target is `f4:4d:30:13:f3:ff` — this is the physical NIC's
+  (`nic0`) address; `vmbr0` reports the identical MAC only because `nic0` is its sole bridge
+  member, not because the two happen to coincide. WoL is armed persistently via
+  `/etc/network/interfaces`'s `nic0` stanza (`post-up /usr/sbin/ethtool -s nic0 wol g`), so it
+  survives a reboot with no separate systemd unit needed. Confirmed for real: a clean
+  `shutdown -h now` on the host left the NIC's link/activity lights lit (standby power to the
+  card is intact — BIOS/ErP is not cutting it), and the host woke from the MacBook afterward.
+
+  The actual fault was on the macOS side, not the server. Plain `wakeonlan f4:4d:30:13:f3:ff`
+  (limited broadcast, `255.255.255.255`) sends without error but never reaches the host; `wakeonlan
+  -i 192.168.1.255 f4:4d:30:13:f3:ff` (the LAN's directed broadcast address) does. macOS does not
+  reliably deliver `255.255.255.255` as an L2 broadcast on this network the way a subnet-directed
+  broadcast does — any WoL invocation from this MacBook needs `-i 192.168.1.255`, not the limited
+  broadcast address.
 - **External (off-LAN) access is Tailscale**, decided and set up: the MacBook and the repository
   owner's iPhone are both on the same tailnet (WireGuard-based mesh, no port forwarding, nothing
   exposed to the public internet — matches the "management interfaces never exposed directly"
