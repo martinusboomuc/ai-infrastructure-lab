@@ -5,6 +5,11 @@ export interface HostHealth {
   up: boolean | null;
 }
 
+export interface QuickLink {
+  label: string;
+  url: string;
+}
+
 export interface TopologyNode {
   id: string;
   label: string;
@@ -13,6 +18,7 @@ export interface TopologyNode {
   online: boolean;
   tailscale_ip: string | null;
   health: HostHealth | null;
+  links: QuickLink[];
 }
 
 // Always relative: in production nginx reverse-proxies /api/ to the backend container by its

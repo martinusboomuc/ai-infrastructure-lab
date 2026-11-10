@@ -28,6 +28,7 @@
 
 .graph-container {
   flex: 1;
+  position: relative;
 }
 
 .graph-error {
@@ -49,6 +50,7 @@
   background: #1e293b;
   border: 1px solid #334155;
   transition: border-color 0.2s;
+  cursor: pointer;
 }
 
 .homelab-node.online {
@@ -134,4 +136,126 @@
   color: #94a3b8;
   width: 28px;
   text-align: right;
+}
+
+.detail-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: 280px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow-y: auto;
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.detail-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-type {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.detail-close {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0 0 12px;
+}
+
+.detail-close:hover {
+  color: #e2e8f0;
+}
+
+.detail-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detail-status.up {
+  color: #4ade80;
+}
+
+.detail-status.down {
+  color: #64748b;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.detail-row-label {
+  color: #64748b;
+}
+
+.detail-row-value {
+  font-family: ui-monospace, monospace;
+  color: #94a3b8;
+}
+
+.detail-health {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid #334155;
+}
+
+.detail-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #334155;
+}
+
+.detail-links-heading {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-link {
+  font-size: 13px;
+  color: #60a5fa;
+  text-decoration: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+}
+
+.detail-link:hover {
+  border-color: #60a5fa;
+}
+
+.detail-links-empty {
+  font-size: 12px;
+  color: #64748b;
 }

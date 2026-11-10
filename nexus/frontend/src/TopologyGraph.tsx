@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { ReactFlow, Background, type Edge, type Node } from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReactFlow, Background, type Edge, type Node, type NodeMouseHandler } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { fetchTopology, type TopologyNode } from "./api";
 import { HomelabNode } from "./HomelabNode";
+import { NodeDetailPanel } from "./NodeDetailPanel";
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -76,6 +77,7 @@ function buildGraph(topologyNodes: TopologyNode[]): { nodes: Node[]; edges: Edge
 export function TopologyGraph() {
   const [topologyNodes, setTopologyNodes] = useState<TopologyNode[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +105,15 @@ export function TopologyGraph() {
     [topologyNodes],
   );
 
+  // Looked up by id on every render, not captured once at click time — a node still selected
+  // when the next poll lands shows that poll's fresh health/online state, not a stale snapshot.
+  // The synthetic "tailscale" hub isn't in topologyNodes at all, so clicking it is a no-op here.
+  const selectedNode = topologyNodes?.find((n) => n.id === selectedNodeId) ?? null;
+
+  const handleNodeClick = useCallback<NodeMouseHandler>((_event, node) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
   if (error && !topologyNodes) {
     return <div className="graph-error">Can't reach the Nexus backend: {error}</div>;
   }
@@ -127,10 +138,14 @@ export function TopologyGraph() {
         nodesDraggable
         nodesConnectable={false}
         elementsSelectable={false}
+        onNodeClick={handleNodeClick}
         proOptions={{ hideAttribution: true }}
       >
         <Background color="#1e293b" gap={24} />
       </ReactFlow>
+      {selectedNode && (
+        <NodeDetailPanel node={selectedNode} onClose={() => setSelectedNodeId(null)} />
+      )}
     </div>
   );
 }

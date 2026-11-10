@@ -63,8 +63,13 @@ that's already joined the tailnet) — see `backend/app/tailscale.py`'s docstrin
    personal devices (MacBook, iPhone) shown only while actually connected to the tailnet.
 2. **Deployment** (done) — containerized and running on `docker-01` alongside MLflow and
    monitoring. Not yet reachable at its own subdomain through the existing Cloudflare Tunnel.
-3. **Quick-launch per node** — click a node, get its live detail plus direct links out to the
-   real tool it represents (Grafana's dashboard, Prometheus, MLflow, the Discord alert channels).
+3. **Quick-launch per node** (done) — click a node, get a detail panel with its live status,
+   health, and direct links out to the real tool it represents: Grafana's dashboard and a
+   Prometheus query scoped to that node's `role` for every monitored host, plus the Proxmox web
+   UI on `pve01` and MLflow on `docker-01`. The Discord alert channels are deliberately not
+   linked — the webhook URL is a credential and isn't in this repository (see
+   `infrastructure/homelab/monitoring/README.md`), and no separate, safely-linkable channel URL
+   is documented anywhere else.
 4. **MLflow and feature browsing** — select a registered model, see its real metrics, model card,
    and the features it was trained on, grounded in the same data the training pipeline itself
    produces (`features.parquet`, Evidently drift reports, SHAP reason codes).

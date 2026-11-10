@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from app.links import QuickLink, quick_links
 from app.prometheus import HostHealth, get_health_by_role
 from app.tailscale import get_tailnet_status
 
@@ -39,6 +40,7 @@ class TopologyNode:
     online: bool
     tailscale_ip: str | None
     health: HostHealth | None = field(default=None)
+    links: list[QuickLink] = field(default_factory=list)
 
 
 async def get_topology() -> list[TopologyNode]:
@@ -64,6 +66,7 @@ async def get_topology() -> list[TopologyNode]:
                     online=peer.online,
                     tailscale_ip=peer.tailscale_ip,
                     health=health_by_role.get(role) if role else None,
+                    links=quick_links(node_id, role, peer.tailscale_ip),
                 )
             )
         elif peer.os in _PERSONAL_DEVICE_OS:
