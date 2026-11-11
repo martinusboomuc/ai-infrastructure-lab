@@ -1,0 +1,80 @@
+name: Nexus build and push
+
+# A push to main touching either Nexus service lints it, builds both images and pushes them to
+# GitHub Container Registry, tagged with the first 12 characters of the commit SHA. k3s pulls a
+# pinned tag set in nexus/deploy/k8s/kustomization.yaml, never `latest` (docs/decisions/0003).
+#
+# GHCR for the same reason as BankML (mlops ADR-0010). Each package must be made public once, by
+# hand, in its GitHub package settings (Change visibility -> Public), so the cluster pulls it with
+# no registry credentials.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nexus/backend/**'
+      - 'nexus/frontend/**'
+      - '.github/workflows/nexus-images.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: nexus-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    defaults:
+      run:
+        working-directory: nexus/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        if: matrix.service == 'backend'
+        with:
+          version: '0.9.25'
+
+      - name: Lint backend
+        if: matrix.service == 'backend'
+        run: |
+          uv sync --locked
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - uses: actions/setup-node@v4
+        if: matrix.service == 'frontend'
+        with:
+          node-version: '20'
+
+      # The type check and production build run inside the image build below.
+      - name: Lint frontend
+        if: matrix.service == 'frontend'
+        run: |
+          npm ci
+          npm run lint
+
+      - name: Compute image name and tag
+        id: image
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/nexus-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        run: |
+          docker build -t "${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}" .
+          docker push "${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}"
