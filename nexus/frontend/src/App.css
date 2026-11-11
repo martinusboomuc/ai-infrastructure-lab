@@ -68,7 +68,8 @@
 }
 
 .node-icon {
-  font-size: 16px;
+  flex-shrink: 0;
+  color: #94a3b8;
 }
 
 .node-label {

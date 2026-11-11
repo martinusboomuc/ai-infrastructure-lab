@@ -1,20 +1,14 @@
 import { Handle, Position } from "@xyflow/react";
 import type { TopologyNode } from "./api";
 import { HealthBar } from "./HealthBar";
-
-const ICONS: Record<TopologyNode["type"], string> = {
-  host: "🖥️",
-  vm: "📦",
-  laptop: "💻",
-  phone: "📱",
-};
+import { NodeIcon } from "./NodeIcon";
 
 export function HomelabNode({ data }: { data: TopologyNode }) {
   return (
     <div className={`homelab-node ${data.online ? "online" : "offline"}`}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <div className="node-header">
-        <span className="node-icon">{ICONS[data.type]}</span>
+        <NodeIcon type={data.type} />
         <span className="node-label">{data.label}</span>
         <span className={`status-dot ${data.online ? "up" : "down"}`} />
       </div>
