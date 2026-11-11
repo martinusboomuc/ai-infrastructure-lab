@@ -41,6 +41,31 @@ full topology. Sections marked TBD are genuinely undecided, not omitted by accid
   `tailscaled` enabled to survive a reboot. Every machine in the homelab is now independently
   reachable from anywhere; none of them depends on another (including the MacBook) being on or
   reachable to bridge to it.
+- **DNS on the VMs goes through `systemd-resolved`**, with Tailscale configuring it over DBus:
+  tailnet names go to `100.100.100.100`, everything else to the router (`192.168.1.1`).
+  `/etc/resolv.conf` must stay a symlink to `/run/systemd/resolve/stub-resolv.conf`.
+
+  On `k8s-01` and `monitoring-01` it was not. Tailscale had overwritten `/etc/resolv.conf` with
+  a plain file listing only `100.100.100.100`, with no upstream to forward public names to.
+  `tailscaled` logged `dns: resolver: forward: no upstream resolvers set, returning SERVFAIL`,
+  and every public lookup failed. k3s could not pull images (`lookup registry-1.docker.io: Try
+  again`), and Grafana could not resolve `discord.com`, so Discord alerts had no route out even
+  though nothing reported an error. `docker-01`, where the symlink was intact, was unaffected.
+
+  The fix on each VM restores the symlink and restarts `tailscaled`, which then detects
+  `systemd-resolved` and uses it:
+
+  ```bash
+  sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+  sudo systemctl restart tailscaled
+  ```
+
+  Two follow-ups were needed. Docker copies the resolver config when a container starts, so
+  Grafana needed a restart. k3s chooses the kubelet's `resolvConf` at startup and had pinned the
+  old file. With a loopback stub in its place, `systemctl restart k3s` switches it to
+  `/run/systemd/resolve/resolv.conf`, then `kubectl -n kube-system rollout restart
+  deploy/coredns` makes CoreDNS use it. Tailscale is installed by hand, not by cloud-init, so a
+  rebuilt VM needs this checked again.
 
 ## Constraint this creates
 
