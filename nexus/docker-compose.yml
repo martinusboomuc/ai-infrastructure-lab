@@ -1,3 +1,5 @@
+# Runs the full stack on one Docker host, for local testing. Production runs on k3s instead, from
+# the manifests in deploy/k8s/ (docs/decisions/0003).
 services:
   backend:
     build: ./backend
@@ -7,16 +9,14 @@ services:
     # this directly, so it isn't exposed to the LAN/tailnet at all.
     environment:
       PROMETHEUS_URL: ${PROMETHEUS_URL:-http://192.168.1.136:9090}
-    volumes:
-      # The host's real tailscaled socket — backend/app/tailscale.py's `tailscale status --json`
-      # talks to this directly, so presence reflects docker-01's own actual tailnet view, not a
-      # separate in-container Tailscale identity that would need its own auth key.
-      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+      # Read-only Tailscale OAuth client. Put both in nexus/.env, which is git-ignored.
+      TS_OAUTH_CLIENT_ID: ${TS_OAUTH_CLIENT_ID:?set in nexus/.env}
+      TS_OAUTH_CLIENT_SECRET: ${TS_OAUTH_CLIENT_SECRET:?set in nexus/.env}
 
   frontend:
     build: ./frontend
     restart: unless-stopped
     ports:
-      # 8080 is already cAdvisor's port on this host (infrastructure/homelab/cadvisor/) — found
+      # 8080 is already cAdvisor's port on docker-01 (infrastructure/homelab/cadvisor/) — found
       # the hard way, by silently hitting cAdvisor's own web UI instead of this frontend.
       - "8081:80"
