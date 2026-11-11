@@ -50,7 +50,9 @@ full topology. Sections marked TBD are genuinely undecided, not omitted by accid
   `tailscaled` logged `dns: resolver: forward: no upstream resolvers set, returning SERVFAIL`,
   and every public lookup failed. k3s could not pull images (`lookup registry-1.docker.io: Try
   again`), and Grafana could not resolve `discord.com`, so Discord alerts had no route out even
-  though nothing reported an error. `docker-01`, where the symlink was intact, was unaffected.
+  though nothing reported an error. `docker-01` had the same fault after the September power
+  outage, when it broke the Cloudflare Tunnel, and was fixed then. The other two VMs were not
+  checked at the time, and stayed broken for two months.
 
   The fix on each VM restores the symlink and restarts `tailscaled`, which then detects
   `systemd-resolved` and uses it:
