@@ -8,8 +8,9 @@ system actually look like, and what's running where" — a designed, explorable 
 underlying data (Tailscale presence, Prometheus health, eventually MLflow's model registry and
 BankML's feature metadata), not another set of generic metric panels.
 
-**Status:** Phase 1 (topology + presence) — deployed and live on `docker-01`. See
-`infrastructure/homelab/monitoring/` for the Grafana/Prometheus stack this reads from.
+**Status:** Phase 1 (topology + presence), running on the k3s cluster on `k8s-01` and reachable
+at `http://k8s-01/` over the tailnet. See `infrastructure/homelab/monitoring/` for the
+Grafana/Prometheus stack this reads from.
 
 ## Why a separate app, not another Grafana dashboard
 
@@ -44,25 +45,48 @@ either environment — found the hard way once already: an earlier version baked
 address at build time, which worked from the LAN and silently failed once the page was loaded
 from anywhere else.
 
+The backend reads tailnet presence from the Tailscale API, so it needs a read-only OAuth client
+in the environment (`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_CLIENT_SECRET`). For the full stack on one
+host, put both in `nexus/.env` (git-ignored) and run `docker compose up -d --build`; the
+frontend is then on `:8081`.
+
 ## Deploying
 
+Nexus runs on k3s, from the Kustomize manifests in `deploy/k8s/`. The reasoning is in
+[ADR-0003](../docs/decisions/0003-nexus-on-k3s.md).
+
+1. A push to `main` that touches `backend/` or `frontend/` builds both images and pushes them to
+   GHCR, tagged with the commit's first 12 SHA characters (`.github/workflows/nexus-images.yml`).
+2. A release is a commit that sets those tags in `deploy/k8s/kustomization.yaml`.
+3. On `k8s-01`, from the repository checkout:
+
+   ```bash
+   sudo k3s kubectl apply -k nexus/deploy/k8s
+   sudo k3s kubectl -n nexus rollout status deploy/backend deploy/frontend
+   ```
+
+Before the first apply, the Tailscale OAuth client is created once in the Tailscale admin console
+(Settings, Trust credentials) with only the `devices:core:read` scope. Its secret goes into the
+cluster by hand and is never committed. `read -s` keeps it out of the shell history:
+
 ```bash
-cd nexus
-docker compose up -d --build
+sudo k3s kubectl create namespace nexus
+read -s TS_ID; read -s TS_SECRET
+sudo k3s kubectl -n nexus create secret generic tailscale-oauth \
+  --from-literal=TS_OAUTH_CLIENT_ID="$TS_ID" --from-literal=TS_OAUTH_CLIENT_SECRET="$TS_SECRET"
+unset TS_ID TS_SECRET
 ```
 
-Builds and runs both services on `docker-01`: the backend has no published port at all (nginx
-reverse-proxies `/api/` to it internally, by Compose service name — nothing external needs to
-reach it directly), the frontend (a static build served by nginx) is published on `:8081`.
-Requires `/var/run/tailscale/tailscaled.sock` to exist on the host running this (i.e., a host
-that's already joined the tailnet) — see `backend/app/tailscale.py`'s docstring.
+Inside the cluster the backend is a ClusterIP Service with no external exposure. nginx
+reverse-proxies `/api/` to it, and Traefik routes the node's port 80 to nginx.
 
 ## Roadmap
 
 1. **Topology + presence** (done) — live node graph: the Proxmox host, its three VMs, and
    personal devices (MacBook, iPhone) shown only while actually connected to the tailnet.
-2. **Deployment** (done) — containerized and running on `docker-01` alongside MLflow and
-   monitoring. Not yet reachable at its own subdomain through the existing Cloudflare Tunnel.
+2. **Deployment** (done) — containerized, first on `docker-01` under Compose, now on k3s with
+   images built by CI (ADR-0003). Not yet reachable at its own subdomain through the existing
+   Cloudflare Tunnel.
 3. **Quick-launch per node** (done) — click a node, get a detail panel with its live status,
    health, and direct links out to the real tool it represents: Grafana's dashboard and a
    Prometheus query scoped to that node's `role` for every monitored host, plus the Proxmox web

@@ -24,9 +24,9 @@ The lab contains three projects. Each one is documented on its own and can be re
    │                                                                         │
    │  k8s-01             docker-01                     monitoring-01         │
    │  k3s                MLflow + Postgres             Prometheus            │
-   │  kube-state-        BankML training               Grafana               │
-   │  metrics            Nexus                         Pushgateway           │
-   │                     cAdvisor                                            │
+   │  Nexus              BankML training               Grafana               │
+   │  kube-state-        cAdvisor                      Pushgateway           │
+   │  metrics                                                                │
    │                                                                         │
    │  node_exporter on every host  →  Prometheus  →  Grafana  →  Discord     │
    └────────────────────────────┬────────────────────────────────────────────┘
@@ -38,6 +38,7 @@ The lab contains three projects. Each one is documented on its own and can be re
    └─────────────────────────────────────────────────────────────────────────┘
 
    GitHub Actions: lint and test BankML pull requests · build, push and deploy
+   BankML serving · build and push Nexus images
 ```
 
 The split between self-hosted and managed services is decided in
@@ -83,15 +84,18 @@ Problems solved on this hardware, each documented with the exact error and the c
 A FastAPI backend combines live Tailscale presence with Prometheus health, using the same PromQL
 as the Grafana dashboards so the two views never disagree. A React Flow frontend renders the
 result as a live topology graph. Clicking a node shows its status and links straight to the tool
-behind it: Grafana, Prometheus, MLflow or the Proxmox web UI. It runs on `docker-01` behind nginx.
+behind it: Grafana, Prometheus, MLflow or the Proxmox web UI. It runs on the k3s cluster on
+`k8s-01`, deployed from Kustomize manifests with images built by CI
+([ADR-0003](docs/decisions/0003-nexus-on-k3s.md)).
 The roadmap ends with a local LLM copilot on the host's unused GPU: [nexus/README.md](nexus/).
 
 ## How the work is done
 
-- **Decisions:** 16 ADRs across the lab and BankML, each written before or alongside the change
+- **Decisions:** 17 ADRs across the lab and BankML, each written before or alongside the change
   it justifies.
 - **CI/CD:** GitHub Actions lints and tests every pull request that touches BankML (30 pytest
-  modules), and builds, pushes and deploys the serving image.
+  modules), and builds, pushes and deploys the serving image. A second workflow builds the Nexus
+  images.
 - **Commits:** small, one logical change each, with plain imperative messages.
 - **Learning log:** every working session is recorded with the problems hit, the exact error
   messages, and why each fix worked. A one-way sync (`scripts/sync_notion.py`) publishes project

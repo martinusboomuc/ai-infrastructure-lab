@@ -1,0 +1,18 @@
+# Traefik ships with k3s and listens on the node's ports 80 and 443. No host rule yet: Nexus is
+# the only application on the cluster, so it answers on http://k8s-01/ over the tailnet.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexus
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  name: http

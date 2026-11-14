@@ -16,6 +16,7 @@ old one; the old one stays, marked as superseded.
 |---|---|---|
 | [0001](0001-hybrid-infrastructure.md) | Hybrid infrastructure: homelab for self-hosted services, cloud for managed ones | Accepted |
 | [0002](0002-proxmox-vm-layout.md) | Proxmox VM layout: three VMs split by role | Accepted |
+| [0003](0003-nexus-on-k3s.md) | Run Nexus on k3s, reading tailnet presence through the Tailscale API | Accepted |
 
 ## Template
 

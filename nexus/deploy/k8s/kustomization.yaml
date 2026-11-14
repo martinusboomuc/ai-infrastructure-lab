@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nexus
+
+resources:
+  - namespace.yaml
+  - backend.yaml
+  - frontend.yaml
+  - ingress.yaml
+
+configMapGenerator:
+  - name: backend-config
+    literals:
+      - PROMETHEUS_URL=http://192.168.1.136:9090
+
+# Pinned to the commit the images were built from (.github/workflows/nexus-images.yml). A new
+# release is a commit that changes these two tags.
+images:
+  - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/nexus-backend
+    newTag: 30beb13ff80a
+  - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/nexus-frontend
+    newTag: 30beb13ff80a

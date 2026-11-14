@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app.kubernetes.io/name: nexus-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nexus-backend
+    spec:
+      # The backend never talks to the Kubernetes API, so it gets no token to do so.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          image: ghcr.io/martinusboomuc/ai-infrastructure-lab/nexus-backend
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            # Created by hand, never committed: see nexus/README.md, "Deploying".
+            - secretRef:
+                name: tailscale-oauth
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+# Named `backend` so nginx's `proxy_pass http://backend:8000` resolves unchanged from Compose.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app.kubernetes.io/name: nexus-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
