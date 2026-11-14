@@ -1,0 +1,2 @@
+# /etc/rancher/k3s/config.yaml on k8s-01. Read by k3s at startup; see ../README.md, "Cluster DNS".
+resolv-conf: /etc/rancher/k3s/resolv.conf

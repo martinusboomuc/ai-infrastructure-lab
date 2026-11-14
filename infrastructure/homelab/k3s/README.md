@@ -34,6 +34,27 @@ curl -s http://localhost:30080/metrics | grep kube_pod_status_phase | head -3
 `kube-state-metrics` in `infrastructure/homelab/monitoring/prometheus.yml`) — no config on this
 host beyond applying the manifest; nothing here needs touching when the scrape side changes.
 
+## Cluster DNS
+
+CoreDNS forwards names outside the cluster to the resolvers in the file the kubelet is given.
+By default that is the node's own list, which on `k8s-01` starts with Tailscale's
+`100.100.100.100`. That resolver does not answer queries forwarded from pods, so public lookups
+from pods failed or came back with IPv6 addresses only, depending on which upstream CoreDNS
+picked. Pods have no IPv6 route, so those lookups failed too.
+
+`node/` holds the fix, installed on `k8s-01` as `/etc/rancher/k3s/config.yaml` and
+`/etc/rancher/k3s/resolv.conf`. It gives k3s a resolver file that lists only the router:
+
+```bash
+sudo install -m 0644 node/config.yaml /etc/rancher/k3s/config.yaml
+sudo install -m 0644 node/resolv.conf /etc/rancher/k3s/resolv.conf
+sudo systemctl restart k3s
+sudo k3s kubectl -n kube-system rollout restart deploy/coredns
+```
+
+Pods cannot resolve tailnet names (`*.ts.net`) as a result. Nothing in the cluster needs them:
+Nexus reads presence through the Tailscale API and reaches the other VMs by LAN address.
+
 ## Tearing down
 
 ```bash

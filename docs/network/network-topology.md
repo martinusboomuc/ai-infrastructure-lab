@@ -69,6 +69,11 @@ full topology. Sections marked TBD are genuinely undecided, not omitted by accid
   deploy/coredns` makes CoreDNS use it. Tailscale is installed by hand, not by cloud-init, so a
   rebuilt VM needs this checked again.
 
+  A second fault on `k8s-01` showed up on 2026-11-14. CoreDNS forwarded to the node's resolver
+  list, which starts with `100.100.100.100`, and Tailscale's resolver does not answer queries
+  forwarded from pods. k3s now uses its own resolver file that lists only the router
+  (`infrastructure/homelab/k3s/README.md`, "Cluster DNS").
+
 ## Constraint this creates
 
 Per [ADR-0001](../decisions/0001-hybrid-infrastructure.md)'s Consequences: because management
