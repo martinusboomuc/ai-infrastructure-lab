@@ -13,11 +13,14 @@ configMapGenerator:
   - name: backend-config
     literals:
       - PROMETHEUS_URL=http://192.168.1.136:9090
+      # Channel links, not webhooks: they only open the channel for members of the server.
+      - DISCORD_HOMELAB_CHANNEL_URL=https://discord.com/channels/1483548053096103978/1552287236668784690
+      - DISCORD_BANKML_CHANNEL_URL=https://discord.com/channels/1483548053096103978/1483548053859205354
 
 # Pinned to the commit the images were built from (.github/workflows/nexus-images.yml). A new
 # release is a commit that changes these two tags.
 images:
   - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/nexus-backend
-    newTag: 30beb13ff80a
+    newTag: fefcc1abef3e
   - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/nexus-frontend
-    newTag: 30beb13ff80a
+    newTag: fefcc1abef3e
