@@ -29,6 +29,11 @@ services:
       # remote client (a laptop, the deployed Container App) never talks to Azure directly, only
       # MLflow's own HTTP API does, same as before this changed from a local volume.
       AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+    # --allowed-hosts: MLflow 3 rejects any Host header outside localhost and private IPs, as a
+    # DNS rebinding guard. Setting the list replaces that default, so it names every way this
+    # server is reached: localhost:5000 (training on this host, and the Cloudflare Tunnel, which
+    # rewrites Host to it), the LAN IP, and the hostname and Tailscale address that Nexus links
+    # to. The tailnet range (100.64.0.0/10) is not private, so it is refused by default.
     command: >
       mlflow server
       --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -37,6 +42,7 @@ services:
       --serve-artifacts
       --host 0.0.0.0
       --port 5000
+      --allowed-hosts localhost,localhost:5000,127.0.0.1:5000,192.168.1.115:5000,docker-01:5000,docker-01.tailfb8c1f.ts.net:5000,100.127.8.10:5000
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 10s
