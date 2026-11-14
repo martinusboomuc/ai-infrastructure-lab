@@ -18,8 +18,9 @@ import httpx
 
 from app.links import GRAFANA_URL, QuickLink
 
-# Reached from inside the cluster, which may differ from the URL a browser should open.
-GRAFANA_API_URL = os.environ.get("GRAFANA_API_URL", GRAFANA_URL)
+# Reached from inside the cluster, where tailnet names do not resolve, so a LAN address rather
+# than the browser-facing GRAFANA_URL.
+GRAFANA_API_URL = os.environ.get("GRAFANA_API_URL", "http://192.168.1.136:3000")
 
 
 @dataclass

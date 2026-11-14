@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from app.alerts import GRAFANA_API_URL
 from app.links import GRAFANA_URL, MLFLOW_URL, QuickLink
 from app.links import PROMETHEUS_URL as PROMETHEUS_UI_URL
 from app.prometheus import PROMETHEUS_URL
@@ -28,7 +29,8 @@ BANKML_API_URL = os.environ.get(
 # LAN addresses, reachable from inside the cluster. The public MLflow domain sits behind
 # Cloudflare Access and answers 403 without a login, so it is probed separately as the tunnel.
 _MLFLOW_HEALTH_URL = os.environ.get("MLFLOW_HEALTH_URL", "http://192.168.1.115:5000/health")
-_GRAFANA_HEALTH_URL = f"{os.environ.get('GRAFANA_API_URL', GRAFANA_URL)}/api/health"
+_GRAFANA_HEALTH_URL = f"{GRAFANA_API_URL}/api/health"
+_MLFLOW_PUBLIC_URL = "https://mlflow.homelab-boom.com"
 
 
 def _repo(path: str) -> str:
@@ -120,8 +122,8 @@ _CATALOG: list[tuple[Service, _Check]] = [
             "cloudflare",
             "Cloudflare Tunnel and Access",
             "Networking",
-            "Publishes MLflow on its own domain through an outbound tunnel, behind a login, with "
-            "no inbound port opened.",
+            "Publishes MLflow on its own domain through an outbound tunnel, with no inbound port "
+            "opened. Access admits only the BankML API's service token.",
             [QuickLink("Dashboard", "https://dash.cloudflare.com")],
             Decision(
                 "Site-to-site VPN between Azure and the homelab",
@@ -134,7 +136,7 @@ _CATALOG: list[tuple[Service, _Check]] = [
         ),
         # Cloudflare Access answers an anonymous request with 403. Getting that answer means the
         # tunnel is up; a tunnel that is down returns a 5xx from Cloudflare's edge instead.
-        _Check(http=MLFLOW_URL, http_ok=frozenset({200, 302, 403})),
+        _Check(http=_MLFLOW_PUBLIC_URL, http_ok=frozenset({200, 302, 403})),
     ),
     (
         Service(

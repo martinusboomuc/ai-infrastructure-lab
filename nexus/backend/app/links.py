@@ -14,9 +14,14 @@ import os
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
-GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://192.168.1.136:3000")
-PROMETHEUS_URL = os.environ.get("PROMETHEUS_UI_URL", "http://192.168.1.136:9090")
-MLFLOW_URL = os.environ.get("MLFLOW_URL", "https://mlflow.homelab-boom.com")
+# Opened by the viewer's browser, so these use the VMs' short hostnames: the home router resolves
+# them on the LAN and Tailscale's MagicDNS resolves them over the tailnet, so the same link works
+# in both places. A LAN IP only works at home.
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://monitoring-01:3000")
+PROMETHEUS_URL = os.environ.get("PROMETHEUS_UI_URL", "http://monitoring-01:9090")
+# MLflow's own port, not its public domain: Cloudflare Access on that domain admits only the
+# Azure Container App's service token, and refuses a browser with 403.
+MLFLOW_URL = os.environ.get("MLFLOW_URL", "http://docker-01:5000")
 
 # The "Homelab Overview" dashboard has no per-role template variable — every panel plots all
 # roles at once (infrastructure/homelab/monitoring/grafana/provisioning/dashboards/json/
