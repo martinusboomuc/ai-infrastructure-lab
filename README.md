@@ -84,9 +84,10 @@ Problems solved on this hardware, each documented with the exact error and the c
 A FastAPI backend combines live Tailscale presence with Prometheus health, using the same PromQL
 as the Grafana dashboards so the two views never disagree. A React Flow frontend renders the
 result as a live topology graph. Clicking a node shows its status and links straight to the tool
-behind it: Grafana, Prometheus, MLflow or the Proxmox web UI. It runs on the k3s cluster on
-`k8s-01`, deployed from Kustomize manifests with images built by CI
-([ADR-0003](docs/decisions/0003-nexus-on-k3s.md)).
+behind it: Grafana, Prometheus, MLflow or the Proxmox web UI. A Services view lists every tool in
+the lab with its live status and the alternative it was chosen over, and an Alerts view shows
+what Grafana is firing. It runs on the k3s cluster on `k8s-01`, deployed from Kustomize manifests
+with images built by CI ([ADR-0003](docs/decisions/0003-nexus-on-k3s.md)).
 The roadmap ends with a local LLM copilot on the host's unused GPU: [nexus/README.md](nexus/).
 
 ## How the work is done

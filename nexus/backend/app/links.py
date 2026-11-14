@@ -4,10 +4,8 @@ knowledge alongside topology.py's `_KNOWN_HOSTS` table: which tool lives where i
 any live source reports, so it's named here explicitly rather than guessed from the node id at
 render time in the frontend.
 
-The Discord alert channels the Nexus roadmap also names are deliberately left out: the webhook
-URL is a credential and isn't in this repository (see
-infrastructure/homelab/monitoring/README.md), and there's no separate, safely-linkable channel
-URL documented anywhere else. Fabricating one would be worse than not linking at all.
+The Discord alert channels are not node links: they belong to the alerts view (app/alerts.py),
+which links the channels themselves and never the webhook URLs Grafana posts to.
 """
 
 from __future__ import annotations

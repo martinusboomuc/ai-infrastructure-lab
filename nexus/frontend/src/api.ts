@@ -32,3 +32,54 @@ export async function fetchTopology(): Promise<TopologyNode[]> {
   const data = await response.json();
   return data.nodes;
 }
+
+export interface Decision {
+  alternative: string;
+  reason: string;
+  adr: QuickLink;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  layer: string;
+  description: string;
+  links: QuickLink[];
+  decision: Decision | null;
+  status: "up" | "down" | "unknown";
+}
+
+export async function fetchServices(): Promise<Service[]> {
+  const response = await fetch("/api/services");
+  if (!response.ok) {
+    throw new Error(`services fetch failed: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.services;
+}
+
+export interface Alert {
+  name: string;
+  folder: string;
+  severity: string;
+  target: string;
+  summary: string;
+  starts_at: string;
+  silenced: boolean;
+}
+
+export interface AlertsResponse {
+  configured: boolean;
+  alerts: Alert[];
+  channels: QuickLink[];
+  grafana_url: string;
+  error: string | null;
+}
+
+export async function fetchAlerts(): Promise<AlertsResponse> {
+  const response = await fetch("/api/alerts");
+  if (!response.ok) {
+    throw new Error(`alerts fetch failed: ${response.status}`);
+  }
+  return response.json();
+}

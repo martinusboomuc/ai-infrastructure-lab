@@ -1,6 +1,7 @@
-"""Nexus backend: aggregates live homelab state (Tailscale presence, Prometheus health) into one
-API the frontend polls. No state of its own — every response is computed fresh from the same
-sources Grafana already reads, so this can be redeployed or restarted with nothing to lose.
+"""Nexus backend: aggregates live homelab state (Tailscale presence, Prometheus health, Grafana
+alerts, the service catalog) into one API the frontend polls. No state of its own — every response
+is computed fresh from the same sources Grafana already reads, so this can be redeployed or
+restarted with nothing to lose.
 """
 
 from __future__ import annotations
@@ -9,6 +10,8 @@ from dataclasses import asdict
 
 from fastapi import FastAPI
 
+from app.alerts import discord_channels, get_alerts
+from app.services import get_services
 from app.topology import get_topology
 
 app = FastAPI(title="Nexus")
@@ -18,6 +21,16 @@ app = FastAPI(title="Nexus")
 async def topology():
     nodes = await get_topology()
     return {"nodes": [asdict(n) for n in nodes]}
+
+
+@app.get("/api/services")
+async def services():
+    return {"services": [asdict(s) for s in await get_services(discord_channels())]}
+
+
+@app.get("/api/alerts")
+async def alerts():
+    return asdict(await get_alerts())
 
 
 @app.get("/health")

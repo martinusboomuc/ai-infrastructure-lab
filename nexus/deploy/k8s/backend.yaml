@@ -33,6 +33,11 @@ spec:
             # Created by hand, never committed: see nexus/README.md, "Deploying".
             - secretRef:
                 name: tailscale-oauth
+            # Grafana Viewer token for the alerts view. Optional: without it the view reports
+            # that alerts are not configured.
+            - secretRef:
+                name: grafana-token
+                optional: true
           readinessProbe:
             httpGet:
               path: /health

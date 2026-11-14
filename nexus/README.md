@@ -77,6 +77,23 @@ sudo k3s kubectl -n nexus create secret generic tailscale-oauth \
 unset TS_ID TS_SECRET
 ```
 
+The alerts view reads active alerts from Grafana with a service account token. In Grafana, create
+a service account with the Viewer role (Administration, Users and access, Service accounts), add a
+token, and store it the same way:
+
+```bash
+read -s GRAFANA_TOKEN
+sudo k3s kubectl -n nexus create secret generic grafana-token \
+  --from-literal=GRAFANA_TOKEN="$GRAFANA_TOKEN"
+unset GRAFANA_TOKEN
+sudo k3s kubectl -n nexus rollout restart deploy/backend
+```
+
+The Discord channel links in the same view are set in `deploy/k8s/kustomization.yaml`
+(`DISCORD_HOMELAB_CHANNEL_URL`, `DISCORD_BANKML_CHANNEL_URL`). A channel URL only opens the
+channel for members of the server, so it is not a secret. The webhook URLs Grafana posts to are,
+and Nexus never reads them.
+
 Inside the cluster the backend is a ClusterIP Service with no external exposure. nginx
 reverse-proxies `/api/` to it, and Traefik routes the node's port 80 to nginx.
 
@@ -94,10 +111,15 @@ reverse-proxies `/api/` to it, and Traefik routes the node's port 80 to nginx.
    linked — the webhook URL is a credential and isn't in this repository (see
    `infrastructure/homelab/monitoring/README.md`), and no separate, safely-linkable channel URL
    is documented anywhere else.
-4. **MLflow and feature browsing** — select a registered model, see its real metrics, model card,
+4. **Service catalog and alerts** (done) — a Services view with every tool the lab runs or
+   depends on, grouped by layer, each with a live status, links out to it, and the alternative it
+   was chosen over where an ADR records one. An Alerts view lists what Grafana is currently
+   firing and links to the Discord channels those alerts land in. Not yet: GitHub Actions run
+   status, which needs a GitHub token.
+5. **MLflow and feature browsing** — select a registered model, see its real metrics, model card,
    and the features it was trained on, grounded in the same data the training pipeline itself
    produces (`features.parquet`, Evidently drift reports, SHAP reason codes).
-5. **Local LLM copilot** — deliberately last. A real NVIDIA GTX 1650 Super (4GB VRAM) sits unused
+6. **Local LLM copilot** — deliberately last. A real NVIDIA GTX 1650 Super (4GB VRAM) sits unused
    on the Proxmox host, enough for a real local model (a 7-8B model at 4-bit quantization, or
    smaller comfortably) once GPU passthrough is set up — a separate hardware decision, not a
    software one, which is why it's sequenced after everything the chat feature would need to be
