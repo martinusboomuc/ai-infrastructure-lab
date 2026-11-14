@@ -79,7 +79,9 @@ async def get_alerts() -> AlertsResponse:
 
     alerts = [
         Alert(
-            name=item["labels"].get("alertname", ""),
+            # When a rule has no data Grafana renames the alert to DatasourceNoData and keeps the
+            # rule's own title in `rulename`.
+            name=item["labels"].get("rulename") or item["labels"].get("alertname", ""),
             folder=item["labels"].get("grafana_folder", ""),
             severity=item["labels"].get("severity", ""),
             target=_target(item["labels"]),
