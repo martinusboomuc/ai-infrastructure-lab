@@ -24,8 +24,26 @@ model's real MLflow metadata) that a generic dashboarding tool has no natural pl
 ```text
 nexus/
 ├── backend/    FastAPI — aggregates live Tailscale presence + Prometheus health into one API
-└── frontend/   React + Vite + React Flow — renders it as a live, polling topology graph
+└── frontend/   React + Vite + three.js — renders it as a live, polling 3D server room
 ```
+
+The frontend is one 3D room (`frontend/src/world/`, react-three-fiber). The hypervisor is the
+rack and each VM is a chassis mounted in it, with CPU, memory and disk on its front display. The
+personal devices sit on a desk. Every tool in the service catalog stands on a plinth as its logo
+extruded into a solid, with its live status as the band of light under it, and each machine
+that is online has a link of light to the Tailscale plinth. A firing alert pulses the object it
+names red and lights a beacon in the room.
+
+What it costs and does not do:
+
+- three.js adds about 330 kB gzipped. It is a separate chunk, loaded only for the room.
+- It needs WebGL 2. A browser without it gets the list view (`List view` in the room), which
+  shows the same services and alerts as cards.
+- An alert is matched to an object by finding the object's id or name in the alert's target and
+  name. An alert that matches nothing is still listed and still lights the beacon.
+- Logos come from the `simple-icons` package and remain their owners' trademarks. Tools with no
+  mark there (cAdvisor, Azure Blob Storage, the BankML API) get a small modelled object instead.
+- Nothing is fetched from a CDN at runtime: no HDR environment map and no web font.
 
 The backend holds no state of its own — every response is computed fresh from the same sources
 Grafana already reads (the exact same PromQL, so a number here never disagrees with what Grafana
@@ -36,6 +54,12 @@ shows), so it can be restarted or redeployed with nothing to lose.
 ```bash
 cd backend && uv sync && uv run uvicorn app.main:app --port 8000
 cd frontend && npm install && npm run dev
+```
+
+To work on the frontend against the deployed backend instead of a local one:
+
+```bash
+cd frontend && NEXUS_API_TARGET=http://k8s-01 npm run dev
 ```
 
 The frontend's own code only ever calls a relative `/api/...` path — Vite's dev server proxies

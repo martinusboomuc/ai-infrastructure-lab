@@ -1,4 +1,4 @@
-import { fetchAlerts, type Alert } from "./api";
+import { fetchAlerts, type Alert, type AlertsResponse } from "./api";
 import { usePolling } from "./usePolling";
 
 const POLL_INTERVAL_MS = 30_000;
@@ -29,18 +29,11 @@ function AlertRow({ alert }: { alert: Alert }) {
   );
 }
 
-export function AlertsView() {
-  const { data, error } = usePolling(fetchAlerts, POLL_INTERVAL_MS);
-
-  if (error && !data) {
-    return <div className="graph-error">Can't reach the Nexus backend: {error}</div>;
-  }
-  if (!data) {
-    return <div className="graph-loading">Loading alerts…</div>;
-  }
-
+// The alert list itself, without the polling: the 3D room's alerts drawer and the list view
+// both render it, from data the caller already holds.
+export function AlertsList({ data }: { data: AlertsResponse }) {
   return (
-    <div className="view-scroll">
+    <>
       <section className="alerts-links">
         <a href={data.grafana_url} target="_blank" rel="noreferrer" className="detail-link">
           Alert rules in Grafana &rarr;
@@ -63,15 +56,30 @@ export function AlertsView() {
           Alerts are not configured: the backend has no Grafana token. See the Nexus README.
         </p>
       )}
-      {data.error && (
-        <p className="graph-error">Grafana did not answer ({data.error}).</p>
-      )}
+      {data.error && <p className="graph-error">Grafana did not answer ({data.error}).</p>}
       {data.configured && !data.error && data.alerts.length === 0 && (
         <p className="alerts-empty">No alerts firing.</p>
       )}
       {data.alerts.map((alert) => (
         <AlertRow key={`${alert.name}-${alert.target}-${alert.starts_at}`} alert={alert} />
       ))}
+    </>
+  );
+}
+
+export function AlertsView() {
+  const { data, error } = usePolling(fetchAlerts, POLL_INTERVAL_MS);
+
+  if (error && !data) {
+    return <div className="graph-error">Can't reach the Nexus backend: {error}</div>;
+  }
+  if (!data) {
+    return <div className="graph-loading">Loading alerts…</div>;
+  }
+
+  return (
+    <div className="view-scroll">
+      <AlertsList data={data} />
     </div>
   );
 }
