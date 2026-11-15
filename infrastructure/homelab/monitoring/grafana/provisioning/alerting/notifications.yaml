@@ -1,0 +1,44 @@
+apiVersion: 1
+
+# Where alerts go (docs/decisions/0006). The webhook URLs are credentials, so they come from
+# monitoring-01's .env through the environment; docker-compose.yml refuses to start Grafana when
+# either is missing, so an empty URL can never replace a working one. The uids are the ones the
+# two contact points had when they were created through the API, so provisioning took them over
+# in place.
+contactPoints:
+  - orgId: 1
+    name: discord-alerts
+    receivers:
+      - uid: dfz14dpcaoiyod
+        type: discord
+        settings:
+          url: $DISCORD_BANKML_WEBHOOK_URL
+          use_discord_username: true
+        disableResolveMessage: false
+  - orgId: 1
+    name: discord-homelab-alerts
+    receivers:
+      - uid: efz4b945rnvuob
+        type: discord
+        settings:
+          url: $DISCORD_HOMELAB_WEBHOOK_URL
+          use_discord_username: true
+        disableResolveMessage: false
+
+# The whole notification tree. BankML's alerts fall through to the root receiver (#bankml-alerts);
+# anything in the Homelab folder goes to #homelab-alerts.
+policies:
+  - orgId: 1
+    receiver: discord-alerts
+    group_by:
+      - grafana_folder
+      - alertname
+    routes:
+      - receiver: discord-homelab-alerts
+        group_by:
+          - alertname
+          - severity
+        object_matchers:
+          - - grafana_folder
+            - =
+            - Homelab

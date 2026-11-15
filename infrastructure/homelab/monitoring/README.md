@@ -53,24 +53,19 @@ target like ntfy.sh would just show a raw JSON dump, not a clean message. Discor
 well-formatted support built into Grafana, so that's what's wired up; verified with a real test
 notification landing in the channel.
 
-The Discord webhook URL is a credential and isn't in this repository — same treatment as every
-other secret here. Set up on a fresh deploy:
+The contact points and the notification tree are provisioned from
+`grafana/provisioning/alerting/notifications.yaml`, like the rules and dashboards
+([ADR-0006](../../../docs/decisions/0006-grafana-notifications-as-code.md)). The Discord webhook
+URLs are credentials, so the file reads them from the environment, and they live only in this
+host's `.env` (`DISCORD_BANKML_WEBHOOK_URL`, `DISCORD_HOMELAB_WEBHOOK_URL`; see
+`.env.example`). `docker-compose.yml` uses `${VAR:?}` for both, so Compose refuses to start
+Grafana when either is missing instead of provisioning an empty URL over a working one.
 
-```bash
-GRAFANA_PW=...  # from .env on monitoring-01
-curl -s -u admin:$GRAFANA_PW -X POST http://localhost:3000/api/v1/provisioning/contact-points \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"discord-alerts","type":"discord","settings":{"url":"<your Discord webhook URL>","use_discord_username":true}}'
-
-curl -s -u admin:$GRAFANA_PW -X PUT http://localhost:3000/api/v1/provisioning/policies \
-  -H 'Content-Type: application/json' \
-  -d '{"receiver":"discord-alerts","group_by":["grafana_folder","alertname"]}'
-```
-
-Not file-provisioned deliberately — a committed contact-point file would need either a real
-secret in git or a placeholder that could silently overwrite the real one on a restart
-(file-provisioned resources reconcile on every Grafana startup). The API-created state persists
-in Grafana's own database volume; this is the one-time setup for a genuinely fresh deploy only.
+Until 2026-11-15 these were created once through Grafana's API and lived only in its database,
+because a committed file seemed to need either the secret itself or a placeholder that would
+overwrite it on restart. Environment interpolation removes both problems, and with it the last
+thing in Grafana's database that could not be rebuilt from this repository. What is left there
+is the Nexus service account token, which is recreated by hand (nexus/README.md).
 
 ### Homelab infrastructure alerts
 
@@ -90,33 +85,9 @@ more rules would triple-page for the same one underlying cause.
 Routed to a **second, separate** Discord channel from BankML's drift alerts — infrastructure
 noise and a specific application's model-quality signal are different audiences even when one
 person is reading both, and mixing them into one channel is exactly the "everything dumped into
-#general" problem worth fixing. Add the route once the new channel's webhook exists:
-
-```bash
-GRAFANA_PW=...  # from .env on monitoring-01
-curl -s -u admin:$GRAFANA_PW -X POST http://localhost:3000/api/v1/provisioning/contact-points \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"discord-homelab-alerts","type":"discord","settings":{"url":"<homelab-alerts channel webhook URL>","use_discord_username":true}}'
-
-curl -s -u admin:$GRAFANA_PW -X PUT http://localhost:3000/api/v1/provisioning/policies \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "receiver": "discord-alerts",
-    "group_by": ["grafana_folder", "alertname"],
-    "routes": [
-      {
-        "receiver": "discord-homelab-alerts",
-        "object_matchers": [["grafana_folder", "=", "Homelab"]],
-        "group_by": ["alertname", "severity"]
-      }
-    ]
-  }'
-```
-
-The root receiver (`discord-alerts`) stays the fallback for anything not matched by a nested
-route — in practice, today, that's exactly the "BankML" folder's alerts, unchanged from before
-this was added. Same not-file-provisioned reasoning as the contact point above: this is API state
-in Grafana's own database, set up once, not reconciled from a committed file on every restart.
+#general" problem worth fixing. The route is the nested policy in `notifications.yaml`: anything
+in the Homelab folder goes to `discord-homelab-alerts`, and everything else falls through to the
+root receiver, `discord-alerts`, which in practice is the BankML folder.
 
 ## Deploying
 

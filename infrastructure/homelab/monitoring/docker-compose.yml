@@ -40,6 +40,10 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Read by grafana/provisioning/alerting/notifications.yaml. `:?` makes Compose refuse to
+      # start rather than provision an empty webhook over a working one.
+      DISCORD_BANKML_WEBHOOK_URL: ${DISCORD_BANKML_WEBHOOK_URL:?set in .env, see README}
+      DISCORD_HOMELAB_WEBHOOK_URL: ${DISCORD_HOMELAB_WEBHOOK_URL:?set in .env, see README}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
