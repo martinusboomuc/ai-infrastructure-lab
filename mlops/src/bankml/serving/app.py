@@ -15,13 +15,13 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 import mlflow.artifacts
 import mlflow.pyfunc
 import pandas as pd
 import pandera.errors
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from mlflow import MlflowClient
 from pydantic import BaseModel, Field
@@ -175,7 +175,12 @@ def metrics() -> Response:
 
 
 @app.post("/predict/credit")
-def predict_credit(payload: CreditPredictionRequest) -> dict:
+def predict_credit(
+    payload: CreditPredictionRequest,
+    # Set to "replay" by bankml.monitoring.replay (ADR-0016). Logged with the prediction so
+    # replayed traffic can always be told apart from real requests; anything else is refused.
+    x_traffic_source: Literal["live", "replay"] = Header("live"),
+) -> dict:
     request_id = str(uuid.uuid4())
     decision_date = payload.decision_date or datetime.now(UTC)
 
@@ -201,6 +206,7 @@ def predict_credit(payload: CreditPredictionRequest) -> dict:
         "decision": decision,
         "threshold": state.threshold,
         "feature_vector": X.iloc[0].to_dict(),
+        "traffic_source": x_traffic_source,
         "timestamp": datetime.now(UTC).isoformat(),
     }
     write_prediction_record(record, domain=DOMAIN)
@@ -212,6 +218,7 @@ def predict_credit(payload: CreditPredictionRequest) -> dict:
         model_version=state.model_version,
         score=score,
         decision=decision,
+        traffic_source=x_traffic_source,
     )
 
     return {

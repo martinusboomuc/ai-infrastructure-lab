@@ -101,3 +101,40 @@ def test_predict_rejects_a_malformed_history_row(client):
         },
     )
     assert response.status_code == 422
+
+
+def _logged_records(tmp_path):
+    import json
+
+    return [
+        json.loads(line)
+        for path in sorted((tmp_path / "credit").glob("*.jsonl"))
+        for line in path.read_text().splitlines()
+    ]
+
+
+def test_predict_logs_live_traffic_by_default(client, tmp_path):
+    client.post("/predict/credit", json={"applicant_id": 1, "applicant": _valid_applicant()})
+
+    assert _logged_records(tmp_path)[-1]["traffic_source"] == "live"
+
+
+def test_predict_logs_replayed_traffic_as_replay(client, tmp_path):
+    response = client.post(
+        "/predict/credit",
+        json={"applicant_id": 1, "applicant": _valid_applicant()},
+        headers={"X-Traffic-Source": "replay"},
+    )
+
+    assert response.status_code == 200
+    assert _logged_records(tmp_path)[-1]["traffic_source"] == "replay"
+
+
+def test_predict_rejects_an_unknown_traffic_source(client):
+    response = client.post(
+        "/predict/credit",
+        json={"applicant_id": 1, "applicant": _valid_applicant()},
+        headers={"X-Traffic-Source": "something-else"},
+    )
+
+    assert response.status_code == 422
