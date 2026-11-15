@@ -214,6 +214,11 @@ merge flow.
       602 logged predictions: no drift, highest PSI 0.146 (`CREDIT_CARD_AMT_BALANCE_MEAN`) against
       a 0.2 threshold.
 
+- [x] Authenticated API: `/predict/credit` and `/metrics` require a per-client bearer key
+      ([ADR-0017](docs/decisions/0017-per-client-api-keys.md)); every logged prediction records
+      which client made it. Added 2026-11-15, because anyone with the URL could write into the
+      log the drift job treats as production traffic.
+
 **Exit criteria — met:** injecting synthetic drift into the input stream raises an alert
 (Prometheus → Grafana → Discord, see
 [infrastructure/homelab/monitoring/README.md](../infrastructure/homelab/monitoring/README.md))
