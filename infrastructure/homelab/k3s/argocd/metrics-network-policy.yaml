@@ -1,0 +1,21 @@
+# The upstream install limits the application controller's metrics port to pods inside the
+# cluster (argocd-application-controller-network-policy). Prometheus runs on monitoring-01,
+# outside it, so its scrape through the NodePort was refused. Network policies are additive:
+# this allows that one host on that one port and leaves the upstream policy as it is.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-application-controller-metrics-from-monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-application-controller
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 192.168.1.136/32
+      ports:
+        - port: 8082
+          protocol: TCP
