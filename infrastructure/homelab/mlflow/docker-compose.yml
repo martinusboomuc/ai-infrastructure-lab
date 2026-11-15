@@ -57,5 +57,25 @@ services:
         condition: service_healthy
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
 
+  # Not a long-running service: the `backup` profile keeps it out of `docker compose up`. The
+  # mlflow-backup systemd timer runs it once a day (docs/decisions/0004). It reaches Postgres over
+  # this stack's own network, so the database is never published on the host.
+  backup:
+    profiles: ["backup"]
+    build: ./backup
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_CONTAINER_URL: https://bankmldvcstore.blob.core.windows.net/backups
+      BACKUP_SAS_TOKEN: ${BACKUP_SAS_TOKEN}
+      PUSHGATEWAY_URL: http://192.168.1.136:9091
+    tmpfs:
+      - /tmp
+
 volumes:
   postgres-data:

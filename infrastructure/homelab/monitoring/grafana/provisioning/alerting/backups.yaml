@@ -1,0 +1,61 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: homelab-backups
+    folder: Homelab
+    interval: 1m
+    rules:
+      - uid: homelab-backup-stale
+        title: Backup has not succeeded recently
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # One series per backed-up target (`target` label from the push URL), so a second
+              # backup added later gets its own alert without a new rule.
+              expr: time() - backup_last_success_timestamp_seconds
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              # 36 hours: one missed daily run is tolerated, two are not.
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [129600]
+              refId: C
+        # No metric at all means no backup has ever been pushed (or the Pushgateway lost its
+        # state), which is the same situation as a stale one: nothing proves a backup exists.
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: >-
+            The last successful backup of {{ $labels.target }} is more than 36 hours old. Check
+            `systemctl status mlflow-backup.service` and `journalctl -u mlflow-backup.service` on
+            docker-01 (docs/runbooks/mlflow-backup-restore.md).

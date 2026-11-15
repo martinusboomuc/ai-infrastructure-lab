@@ -1,0 +1,13 @@
+# Installed to /etc/systemd/system/ on docker-01 (see ../README.md). Runs the backup container
+# once; the timer below decides when.
+[Unit]
+Description=Back up the MLflow registry to Azure Blob
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ops
+WorkingDirectory=/home/ops/ai-infrastructure-lab/infrastructure/homelab/mlflow
+ExecStart=/usr/bin/docker compose --profile backup run --rm --build backup

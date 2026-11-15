@@ -1,0 +1,20 @@
+{
+  "rules": [
+    {
+      "name": "expire-mlflow-backups",
+      "enabled": true,
+      "type": "Lifecycle",
+      "definition": {
+        "filters": {
+          "blobTypes": ["blockBlob"],
+          "prefixMatch": ["backups/mlflow/"]
+        },
+        "actions": {
+          "baseBlob": {
+            "delete": { "daysAfterCreationGreaterThan": 30 }
+          }
+        }
+      }
+    }
+  ]
+}

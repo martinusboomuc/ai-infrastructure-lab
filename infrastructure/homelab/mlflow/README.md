@@ -41,6 +41,41 @@ docker compose ps
 curl http://localhost:5000/health
 ```
 
+## Backups
+
+The Postgres backend store is dumped daily at 03:30 to the `backups` blob container, kept 30
+days, and alerted on when a day is missed
+([ADR-0004](../../../docs/decisions/0004-mlflow-registry-backups.md)). Checking, running and
+restoring are in [the runbook](../../../docs/runbooks/mlflow-backup-restore.md).
+
+One-time setup, from the Mac with `az login` done. The account key is read inline and never
+printed, and the SAS token goes straight into `docker-01`'s `.env`:
+
+```bash
+KEY="$(az storage account keys list -g bankml-data-rg -n bankmldvcstore --query '[0].value' -o tsv)"
+az storage container create --account-name bankmldvcstore --name backups --account-key "$KEY"
+# Create and write only: the token cannot read, list or delete. Deleting the policy revokes it.
+az storage container policy create --account-name bankmldvcstore --container-name backups \
+  --name backup-writer --permissions cw --expiry 2027-11-15T00:00Z --account-key "$KEY"
+az storage account management-policy create -g bankml-data-rg --account-name bankmldvcstore \
+  --policy @infrastructure/homelab/mlflow/backup/lifecycle-policy.json
+az storage container generate-sas --account-name bankmldvcstore --name backups \
+  --policy-name backup-writer --https-only --account-key "$KEY" -o tsv \
+| ssh -i ~/.ssh/id_ed25519_ai_lab ops@192.168.1.115 \
+  'cd ~/ai-infrastructure-lab/infrastructure/homelab/mlflow && read -r t && grep -v "^BACKUP_SAS_TOKEN=" .env > .env.new && printf "BACKUP_SAS_TOKEN=%s\n" "$t" >> .env.new && chmod 600 .env.new && mv .env.new .env'
+unset KEY
+```
+
+Then, on `docker-01`, install the timer:
+
+```bash
+cd ~/ai-infrastructure-lab/infrastructure/homelab/mlflow
+sudo cp systemd/mlflow-backup.service systemd/mlflow-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mlflow-backup.timer
+sudo systemctl start mlflow-backup.service   # first backup now, rather than at 03:30
+```
+
 ## Using it from BankML
 
 From the LAN (e.g. local training runs), point directly at the container:
