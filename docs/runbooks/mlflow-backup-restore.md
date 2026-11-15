@@ -22,11 +22,12 @@ systemctl status mlflow-backup.service
 journalctl -u mlflow-backup.service -n 20
 ```
 
-From the Mac, with `az login` done:
+From the Mac, with `az login` done. `--auth-mode key` makes the CLI fetch the account key
+itself; your login has no Blob data role, so `--auth-mode login` is refused:
 
 ```bash
 az storage blob list --account-name bankmldvcstore --container-name backups \
-  --prefix mlflow/ --auth-mode login --query "[].{name:name, size:properties.contentLength}" -o table
+  --prefix mlflow/ --auth-mode key --query "[].{name:name, size:properties.contentLength}" -o table
 ```
 
 Grafana's "Backup has not succeeded recently" alert, in the Homelab folder, fires to the
@@ -41,13 +42,14 @@ journalctl -u mlflow-backup.service -n 5
 
 ## Restoring
 
-The token on `docker-01` cannot read backups, so a restore downloads with your own Azure login.
+The token on `docker-01` cannot read backups (verified: list, read and delete all return 403),
+so a restore downloads with your own Azure login.
 
 1. Download the dump you want, from the Mac:
 
    ```bash
    az storage blob download --account-name bankmldvcstore --container-name backups \
-     --name mlflow/mlflow-<timestamp>.dump --file mlflow.dump --auth-mode login
+     --name mlflow/mlflow-<timestamp>.dump --file mlflow.dump --auth-mode key
    scp -i ~/.ssh/id_ed25519_ai_lab mlflow.dump ops@192.168.1.115:/tmp/mlflow.dump
    ```
 
