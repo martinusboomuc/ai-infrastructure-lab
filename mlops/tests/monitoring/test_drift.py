@@ -7,6 +7,7 @@ into the input stream raises an alert.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -120,10 +121,17 @@ def test_raises_when_reference_and_current_share_no_comparable_columns():
         compute_drift(reference, current)
 
 
-def _prediction_record(request_id: str, amt_credit: float) -> dict:
+def _prediction_record(
+    request_id: str,
+    amt_credit: float,
+    timestamp: str = "2026-01-01T12:00:00+00:00",
+    model_version: str = "1",
+) -> dict:
     return {
         "request_id": request_id,
         "score": 0.1,
+        "model_version": model_version,
+        "timestamp": timestamp,
         "feature_vector": {"AMT_CREDIT": amt_credit},
     }
 
@@ -329,11 +337,77 @@ def test_a_missing_reference_raises_when_there_is_no_data_root(local_mlflow, mon
 
 def test_too_few_logged_predictions_count_as_nothing_to_compare(stable_population):
     # Two records, as the real prediction log held: PSI on that flags nearly every column.
-    with patch(
-        "bankml.monitoring.drift.load_current_from_prediction_log",
-        return_value=stable_population.head(2),
+    with (
+        patch("bankml.monitoring.drift.MlflowClient") as client,
+        patch(
+            "bankml.monitoring.drift.load_current_from_prediction_log",
+            return_value=stable_population.head(2),
+        ),
     ):
+        client.return_value.get_model_version_by_alias.return_value = MagicMock(version="3")
         result = run_drift_job("credit", min_current=500)
 
     assert result["status"] == "no_data"
     assert result["n_current"] == 2
+    assert result["model_version"] == "3"
+
+
+def test_drift_reads_only_the_window_and_the_production_version(stable_population):
+    with (
+        patch("bankml.monitoring.drift.MlflowClient") as client,
+        patch(
+            "bankml.monitoring.drift.load_current_from_prediction_log",
+            return_value=stable_population.head(2),
+        ) as load,
+    ):
+        client.return_value.get_model_version_by_alias.return_value = MagicMock(version="3")
+        run_drift_job("credit", window_days=7)
+
+    since = load.call_args.kwargs["since"]
+    assert abs((datetime.now(UTC) - timedelta(days=7) - since).total_seconds()) < 60
+    assert load.call_args.kwargs["model_version"] == "3"
+
+
+def test_load_current_keeps_only_the_window_and_the_given_version(monkeypatch, tmp_path):
+    monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+    log_dir = tmp_path / "credit"
+    log_dir.mkdir()
+    (log_dir / "2026-01-01.jsonl").write_text(
+        json.dumps(_prediction_record("old", 1.0, "2026-01-01T12:00:00+00:00")) + "\n"
+    )
+    (log_dir / "2026-01-10.jsonl").write_text(
+        json.dumps(_prediction_record("early", 2.0, "2026-01-10T01:00:00+00:00"))
+        + "\n"
+        + json.dumps(_prediction_record("in", 3.0, "2026-01-10T12:00:00+00:00"))
+        + "\n"
+        + json.dumps(_prediction_record("other-model", 4.0, "2026-01-10T13:00:00+00:00", "2"))
+        + "\n"
+    )
+
+    result = load_current_from_prediction_log(
+        "credit", since=datetime(2026, 1, 10, 6, tzinfo=UTC), model_version="1"
+    )
+
+    assert list(result["AMT_CREDIT"]) == [3.0]
+
+
+def test_a_windowed_read_skips_blobs_from_before_the_window(monkeypatch, tmp_path):
+    monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "fake-connection-string")
+    old, new = MagicMock(), MagicMock()
+    old.name, new.name = "credit/2026-01-01.jsonl", "credit/2026-01-10.jsonl"
+    download = MagicMock()
+    download.readall.return_value = (
+        json.dumps(_prediction_record("in", 3.0, "2026-01-10T12:00:00+00:00")) + "\n"
+    ).encode()
+    container = MagicMock()
+    container.exists.return_value = True
+    container.list_blobs.return_value = [old, new]
+    container.download_blob.return_value = download
+
+    with patch("azure.storage.blob.ContainerClient.from_connection_string", return_value=container):
+        result = load_current_from_prediction_log("credit", since=datetime(2026, 1, 5, tzinfo=UTC))
+
+    container.download_blob.assert_called_once_with("credit/2026-01-10.jsonl")
+    assert list(result["AMT_CREDIT"]) == [3.0]

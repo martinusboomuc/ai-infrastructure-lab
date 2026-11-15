@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -76,7 +76,19 @@ def write_prediction_record(record: dict, domain: str = "credit") -> Path:
     return log_path
 
 
-def _iter_azure_blob_records(domain: str) -> list[dict[str, Any]]:
+def _on_or_after(name: str, since_day: date | None) -> bool:
+    """Whether a day file (`YYYY-MM-DD.jsonl`, local or blob) can hold records from `since_day`
+    on. A file whose name is not a date is always read rather than silently skipped.
+    """
+    if since_day is None:
+        return True
+    try:
+        return date.fromisoformat(Path(name).stem) >= since_day
+    except ValueError:
+        return True
+
+
+def _iter_azure_blob_records(domain: str, since_day: date | None = None) -> list[dict[str, Any]]:
     """The durable copy of the prediction log — the one that actually has real production
     traffic, since the deployed Azure app's local filesystem doesn't survive a restart. A no-op,
     not an error, when `AZURE_STORAGE_CONNECTION_STRING` isn't set.
@@ -95,6 +107,8 @@ def _iter_azure_blob_records(domain: str) -> list[dict[str, Any]]:
 
     records: list[dict[str, Any]] = []
     for blob in container.list_blobs(name_starts_with=f"{domain}/"):
+        if not _on_or_after(blob.name, since_day):
+            continue
         content = container.download_blob(blob.name).readall().decode("utf-8")
         for line in content.splitlines():
             if line.strip():
@@ -102,20 +116,29 @@ def _iter_azure_blob_records(domain: str) -> list[dict[str, Any]]:
     return records
 
 
-def read_all_records(domain: str) -> list[dict[str, Any]]:
+def read_all_records(domain: str, since: datetime | None = None) -> list[dict[str, Any]]:
     """Every logged prediction record for `domain`, from both sinks, deduped by `request_id`
     (the same record can legitimately exist in both). The one shared read path — the drift job
     and the delayed-label performance job both build on this rather than each re-implementing
     "merge local and Azure Blob," so a bug in that merge only ever needs fixing once.
+
+    With `since`, only records served at or after it are returned, and day files from before its
+    date are not read at all, so a windowed read does not grow with the age of the log.
     """
+    since_day = since.astimezone(UTC).date() if since else None
     log_dir = prediction_log_dir(domain)
     by_request_id: dict[str, dict[str, Any]] = {}
     for path in sorted(log_dir.glob("*.jsonl")):
+        if not _on_or_after(path.name, since_day):
+            continue
         for line in path.read_text().splitlines():
             if not line.strip():
                 continue
             rec = json.loads(line)
             by_request_id[rec["request_id"]] = rec
-    for rec in _iter_azure_blob_records(domain):
+    for rec in _iter_azure_blob_records(domain, since_day):
         by_request_id.setdefault(rec["request_id"], rec)
-    return list(by_request_id.values())
+    records = list(by_request_id.values())
+    if since is not None:
+        records = [r for r in records if datetime.fromisoformat(r["timestamp"]) >= since]
+    return records

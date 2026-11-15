@@ -29,6 +29,7 @@ import json
 import os
 import tempfile
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -53,15 +54,27 @@ DEFAULT_PSI_THRESHOLD = (
 # on almost every column. Found running it on the real prediction log, which held 2 records:
 # 95% of features "drifted". Below this, the run counts as having nothing to compare.
 DEFAULT_MIN_CURRENT = 500
+# How far back the comparison looks (ADR-0018). Reading every record ever logged lets months of
+# old traffic dilute a shift that started this week. Seven days of the daily replay (200 a day)
+# is about 1,400 records, comfortably above DEFAULT_MIN_CURRENT.
+DEFAULT_WINDOW_DAYS = 7
 
 
-def load_current_from_prediction_log(domain: str) -> pd.DataFrame:
+def load_current_from_prediction_log(
+    domain: str, since: datetime | None = None, model_version: str | None = None
+) -> pd.DataFrame:
     """Reconstruct one row per logged prediction — the feature vector plus the score the model
     actually produced — from every prediction record `read_all_records` returns (merged across
     both sinks, deduped by `request_id`). Empty DataFrame if nothing has been logged anywhere yet.
+
+    `since` keeps only records served from then on. `model_version` keeps only predictions made
+    by that version: after a promotion, scores from the previous model are not this model's
+    behaviour, and comparing them would report the model change itself as prediction drift.
     """
     records = []
-    for rec in read_all_records(domain):
+    for rec in read_all_records(domain, since=since):
+        if model_version is not None and str(rec.get("model_version")) != str(model_version):
+            continue
         row = dict(rec["feature_vector"])
         row["score"] = rec["score"]
         records.append(row)
@@ -185,18 +198,32 @@ def run_drift_job(
     domain: str = "credit",
     threshold: float = DEFAULT_PSI_THRESHOLD,
     min_current: int = DEFAULT_MIN_CURRENT,
+    window_days: int = DEFAULT_WINDOW_DAYS,
 ) -> dict[str, Any]:
-    current = load_current_from_prediction_log(domain)
+    registered_model_name = f"{domain}-champion"
+    version = MlflowClient().get_model_version_by_alias(registered_model_name, "production")
+    window_start = datetime.now(UTC) - timedelta(days=window_days)
+    window = {
+        "window_days": window_days,
+        "window_start": window_start.isoformat(),
+        "model_version": str(version.version),
+    }
+
+    current = load_current_from_prediction_log(
+        domain, since=window_start, model_version=version.version
+    )
     if len(current) < min_current:
         return {
             "status": "no_data",
             "domain": domain,
             "n_current": len(current),
-            "message": f"{len(current)} logged predictions; at least {min_current} needed",
+            **window,
+            "message": (
+                f"{len(current)} predictions by {registered_model_name} v{version.version} in the "
+                f"last {window_days} days; at least {min_current} needed"
+            ),
         }
 
-    registered_model_name = f"{domain}-champion"
-    version = MlflowClient().get_model_version_by_alias(registered_model_name, "production")
     reference = load_reference_features(domain, version.run_id)
 
     columns = feature_columns(reference)
@@ -215,6 +242,7 @@ def run_drift_job(
         "threshold": threshold,
         "n_reference": len(reference),
         "n_current": len(current),
+        **window,
         "input_drift": input_drift,
         "prediction_drift": prediction_drift,
     }
@@ -226,6 +254,9 @@ def log_drift_run(domain: str, result: dict[str, Any]) -> str:
     """
     mlflow.set_experiment(f"{domain}-monitoring")
     with mlflow.start_run(run_name=f"{domain}-drift") as run:
+        mlflow.log_params(
+            {k: result[k] for k in ("window_days", "window_start", "model_version") if k in result}
+        )
         mlflow.log_metric("n_reference", result["n_reference"])
         mlflow.log_metric("n_current", result["n_current"])
         mlflow.log_metric("input_dataset_drift", int(result["input_drift"]["dataset_drift"]))
@@ -325,8 +356,11 @@ def main(
     domain: str = "credit",
     threshold: float = DEFAULT_PSI_THRESHOLD,
     min_current: int = DEFAULT_MIN_CURRENT,
+    window_days: int = DEFAULT_WINDOW_DAYS,
 ) -> None:
-    result = run_drift_job(domain, threshold=threshold, min_current=min_current)
+    result = run_drift_job(
+        domain, threshold=threshold, min_current=min_current, window_days=window_days
+    )
     print(json.dumps(result, indent=2, default=str))
 
     pushgateway_url = os.environ.get("BANKML_PUSHGATEWAY_URL")
@@ -352,5 +386,11 @@ if __name__ == "__main__":
     parser.add_argument("--domain", default="credit")
     parser.add_argument("--threshold", type=float, default=DEFAULT_PSI_THRESHOLD)
     parser.add_argument("--min-current", type=int, default=DEFAULT_MIN_CURRENT)
+    parser.add_argument("--window-days", type=int, default=DEFAULT_WINDOW_DAYS)
     args = parser.parse_args()
-    main(domain=args.domain, threshold=args.threshold, min_current=args.min_current)
+    main(
+        domain=args.domain,
+        threshold=args.threshold,
+        min_current=args.min_current,
+        window_days=args.window_days,
+    )

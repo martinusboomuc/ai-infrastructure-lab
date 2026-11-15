@@ -219,6 +219,11 @@ merge flow.
       which client made it. Added 2026-11-15, because anyone with the URL could write into the
       log the drift job treats as production traffic.
 
+- [x] Drift over a rolling window: the last seven days, and only predictions made by the current
+      production version ([ADR-0018](docs/decisions/0018-drift-window-and-model-version.md)),
+      instead of every record ever logged. Old day files are not read at all. Added 2026-11-15,
+      because daily replay traffic would have diluted any recent shift below the threshold.
+
 **Exit criteria — met:** injecting synthetic drift into the input stream raises an alert
 (Prometheus → Grafana → Discord, see
 [infrastructure/homelab/monitoring/README.md](../infrastructure/homelab/monitoring/README.md))
