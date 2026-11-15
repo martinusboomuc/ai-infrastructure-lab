@@ -11,6 +11,7 @@ resources:
   # changes this version.
   - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.7/manifests/install.yaml
   - ingress.yaml
+  - metrics-nodeport.yaml
   - root-app.yaml
 
 patches:

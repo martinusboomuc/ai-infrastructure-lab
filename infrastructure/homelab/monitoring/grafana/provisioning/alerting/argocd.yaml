@@ -1,0 +1,67 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: homelab-argocd
+    folder: Homelab
+    interval: 1m
+    rules:
+      - uid: homelab-argocd-app-unhealthy
+        title: Argo CD application out of sync or unhealthy
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # One series per Application that is not both Synced and Healthy. A release that
+              # fails to apply stays OutOfSync; one whose pods never become ready stays
+              # Progressing or Degraded. Both mean the cluster does not run what main says.
+              expr: >-
+                max by (name, sync_status, health_status) (
+                  argocd_app_info{sync_status!="Synced"} or argocd_app_info{health_status!="Healthy"}
+                )
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        # No series means every Application is Synced and Healthy. A lost scrape is caught by
+        # homelab-target-down on up{job="argocd"} instead.
+        noDataState: OK
+        execErrState: Error
+        # A normal release is OutOfSync for up to three minutes (the polling interval) and then
+        # Progressing while pods roll. Fifteen minutes is well past both.
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            Argo CD application {{ $labels.name }} has been {{ $labels.sync_status }} and
+            {{ $labels.health_status }} for over 15 minutes. Open http://k8s-01/argocd/applications/argocd/{{ $labels.name }}
+            for the failing resource, or run `sudo k3s kubectl -n argocd get application
+            {{ $labels.name }} -o jsonpath='{.status.conditions}'` on k8s-01.

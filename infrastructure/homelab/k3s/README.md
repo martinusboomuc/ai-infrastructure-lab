@@ -94,3 +94,8 @@ sudo k3s kubectl apply --server-side --force-conflicts -k argocd
 
 After that, every change, including an Argo CD upgrade, is a commit. `kube-state-metrics.yaml`
 above is still applied by hand.
+
+Prometheus on `monitoring-01` scrapes the application controller on NodePort `30082`
+(`argocd/metrics-nodeport.yaml`, job `argocd`). The Grafana rule `homelab-argocd-app-unhealthy`
+(`monitoring/grafana/provisioning/alerting/argocd.yaml`) alerts on Discord when an Application has
+not been both Synced and Healthy for 15 minutes, which is what a failed release looks like.

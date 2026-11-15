@@ -72,6 +72,9 @@ was free before this change.
   memory on the node went from about 2.5 GB to 1.9 GB.
 - **The cluster now pulls from GitHub and from `raw.githubusercontent.com`** for the pinned
   install. A GitHub outage pauses deploys but does not stop running workloads.
+- **A failed release alerts.** Prometheus scrapes the application controller, and a Grafana rule
+  fires when an Application is not Synced and Healthy for 15 minutes. Without it, a release that
+  did not apply would only show in the UI.
 - **The first admin password is in a generated Secret.** It is changed once in the UI, then that
   Secret is deleted. Access is still a single local admin account.
 - **Not covered:** `kube-state-metrics` and the k3s node configuration are still applied by hand.
