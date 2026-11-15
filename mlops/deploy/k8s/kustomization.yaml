@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: bankml
+
+resources:
+  - namespace.yaml
+  - drift-cronjob.yaml
+
+configMapGenerator:
+  - name: drift-config
+    literals:
+      # LAN addresses: pods do not resolve tailnet names (infrastructure/homelab/k3s/README.md).
+      # Port 5000 directly, not the Cloudflare Tunnel, which only the Azure Container App uses.
+      - MLFLOW_TRACKING_URI=http://192.168.1.115:5000
+      - BANKML_PUSHGATEWAY_URL=http://192.168.1.136:9091
+      # Every logged prediction comes from Azure Blob. The local log directory exists only so the
+      # reader has somewhere empty to look.
+      - BANKML_PREDICTION_LOG_DIR=/tmp/predictions
+      - HOME=/tmp
+
+# Pinned to the commit the image was built from (.github/workflows/mlops-deploy.yml). A new
+# release is a commit that changes this tag.
+images:
+  - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
+    newTag: 63764db51d3f

@@ -198,6 +198,13 @@ merge flow.
       historical `NAME_EDUCATION_TYPE` slice-tolerance pattern documented since Session 005, and
       was correctly **not** promoted — proving the gate decides on its own merits, not drift.
 
+- [x] Drift checked on a schedule: a daily CronJob on the homelab's k3s cluster
+      (`deploy/k8s/`, [ADR-0015](docs/decisions/0015-scheduled-drift-check-on-k3s.md)), reading
+      its reference population from the production model's own MLflow run. Requires 500 logged
+      predictions before computing PSI, and pushes a heartbeat either way. Retraining stays a
+      deliberate run on `docker-01`. Added 2026-11-14, after both drift alerts had fired
+      unattended since 2026-09-23 because nothing ran the job.
+
 **Exit criteria — met:** injecting synthetic drift into the input stream raises an alert
 (Prometheus → Grafana → Discord, see
 [infrastructure/homelab/monitoring/README.md](../infrastructure/homelab/monitoring/README.md))

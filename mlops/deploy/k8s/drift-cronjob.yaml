@@ -1,0 +1,66 @@
+# Daily drift check for Credit Risk (ADR-0015). Runs `python -m bankml.monitoring.drift` from the
+# serving image, which already carries the package and every dependency. The reference population
+# comes from the production model's own MLflow run, so the job needs no copy of the feature set.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-credit
+  labels:
+    app.kubernetes.io/name: bankml-drift
+spec:
+  schedule: "0 6 * * *"
+  timeZone: Europe/Lisbon
+  # A run that is still going when the next one is due is a problem worth seeing, not a reason
+  # to start a second copy against the same Pushgateway group.
+  concurrencyPolicy: Forbid
+  # If the node was down at 06:00, still run once it is back the same morning.
+  startingDeadlineSeconds: 21600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: bankml-drift
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            # The `bankml` user the serving image creates.
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: drift
+              image: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
+              command: ["python", "-m", "bankml.monitoring.drift", "--domain", "credit"]
+              envFrom:
+                - configMapRef:
+                    name: drift-config
+                # Created by hand, never committed: see mlops/deploy/k8s/README.md.
+                - secretRef:
+                    name: azure-storage
+              resources:
+                # Measured: 616 MB peak on a real run against the 184,304-row reference.
+                requests:
+                  cpu: 250m
+                  memory: 768Mi
+                limits:
+                  memory: 1536Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                # MLflow downloads the reference and model artifacts here.
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 1Gi
