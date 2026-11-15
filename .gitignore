@@ -11,6 +11,8 @@ venv/
 
 # Environment variables
 .env
+# Credential files mounted into containers on the VMs (e.g. monitoring's Prometheus API key).
+infrastructure/homelab/monitoring/secrets/
 
 # IDE
 .vscode/

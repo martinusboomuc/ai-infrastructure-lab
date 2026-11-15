@@ -6,6 +6,8 @@ services:
       - pushgateway
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Created by hand on monitoring-01 (README, "BankML API key"); gitignored.
+      - ./secrets/bankml-api-key:/etc/prometheus/secrets/bankml-api-key:ro
       - prometheus-data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml

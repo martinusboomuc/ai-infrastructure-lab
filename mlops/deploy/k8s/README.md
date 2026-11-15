@@ -45,6 +45,17 @@ sudo k3s kubectl -n bankml create secret generic azure-storage \
 unset AZ
 ```
 
+The replay job authenticates to the API with the `replay` client key
+([ADR-0017](../../docs/decisions/0017-per-client-api-keys.md)). The same key must be one of the
+pairs in the Container App's `BANKML_API_KEYS` secret:
+
+```bash
+read -s KEY
+sudo k3s kubectl -n bankml create secret generic bankml-api-key \
+  --from-literal=BANKML_API_KEY="$KEY"
+unset KEY
+```
+
 A release is a commit that sets the image tag in `kustomization.yaml`; the tag is the first 12
 characters of the commit `.github/workflows/mlops-deploy.yml` built. Then, on `k8s-01`:
 

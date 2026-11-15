@@ -80,6 +80,18 @@ where provenance = 'api' and record_type in ('contactPoint', 'route');
 
 A fresh deploy never hits this, since nothing is created through the API first.
 
+### BankML API key
+
+The BankML API's `/metrics` needs the `prometheus` client key
+([mlops ADR-0017](../../../mlops/docs/decisions/0017-per-client-api-keys.md)). Prometheus reads it
+from `secrets/bankml-api-key` on this host, which is gitignored and mounted read-only. The file
+holds only the key, and Prometheus runs as `nobody`, so it is owned by uid 65534:
+
+```bash
+mkdir -p secrets && read -s KEY && printf %s "$KEY" > secrets/bankml-api-key && unset KEY
+sudo chown 65534:65534 secrets/bankml-api-key && sudo chmod 400 secrets/bankml-api-key
+```
+
 ### Homelab infrastructure alerts
 
 `grafana/provisioning/alerting/homelab.yaml` — separate from `drift.yaml`, its own "Homelab"

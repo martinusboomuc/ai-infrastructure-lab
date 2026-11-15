@@ -49,6 +49,13 @@ spec:
                     name: bankml-config
                 - secretRef:
                     name: azure-storage
+              env:
+                # The `replay` client key (ADR-0017). Created by hand, never committed.
+                - name: BANKML_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: bankml-api-key
+                      key: BANKML_API_KEY
               resources:
                 # The whole request file (about 11 MB compressed) is held in memory.
                 requests:

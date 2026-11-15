@@ -61,6 +61,11 @@ scrape_configs:
   # endpoints already have; see infrastructure/homelab/monitoring/README.md's "What's still open").
   - job_name: bankml-credit-serving
     scheme: https
+    # /metrics needs the `prometheus` client key (mlops ADR-0017). The key is a file on this
+    # host only, mounted by docker-compose.yml, never in the repository.
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/bankml-api-key
     static_configs:
       - targets: ["bankml-credit-serving.delightfulgrass-66b6c9e3.spaincentral.azurecontainerapps.io"]
         labels:
