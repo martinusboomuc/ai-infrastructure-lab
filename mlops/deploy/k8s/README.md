@@ -57,11 +57,9 @@ unset KEY
 ```
 
 A release is a commit that sets the image tag in `kustomization.yaml`; the tag is the first 12
-characters of the commit `.github/workflows/mlops-deploy.yml` built. Then, on `k8s-01`:
-
-```bash
-sudo k3s kubectl apply -k mlops/deploy/k8s
-```
+characters of the commit `.github/workflows/mlops-deploy.yml` built. Argo CD's `bankml`
+Application applies it within about three minutes of the push
+([ADR-0007](../../../docs/decisions/0007-argocd-gitops-on-k3s.md)); nothing is applied by hand.
 
 To run either job now rather than waiting for its schedule:
 

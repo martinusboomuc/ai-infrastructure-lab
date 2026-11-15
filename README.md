@@ -87,12 +87,14 @@ result as a live topology graph. Clicking a node shows its status and links stra
 behind it: Grafana, Prometheus, MLflow or the Proxmox web UI. A Services view lists every tool in
 the lab with its live status and the alternative it was chosen over, and an Alerts view shows
 what Grafana is firing. It runs on the k3s cluster on `k8s-01`, deployed from Kustomize manifests
-with images built by CI ([ADR-0003](docs/decisions/0003-nexus-on-k3s.md)).
+with images built by CI ([ADR-0003](docs/decisions/0003-nexus-on-k3s.md)). Argo CD keeps the
+cluster in sync with `main`, so a release is a single commit
+([ADR-0007](docs/decisions/0007-argocd-gitops-on-k3s.md)).
 The roadmap ends with a local LLM copilot on the host's unused GPU: [nexus/README.md](nexus/).
 
 ## How the work is done
 
-- **Decisions:** 24 ADRs across the lab and BankML, each written before or alongside the change
+- **Decisions:** 25 ADRs across the lab and BankML, each written before or alongside the change
   it justifies.
 - **CI/CD:** GitHub Actions lints and tests every pull request that touches BankML (30 pytest
   modules), and builds, pushes and deploys the serving image. A second workflow builds the Nexus

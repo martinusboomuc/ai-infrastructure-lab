@@ -63,3 +63,34 @@ sudo k3s kubectl delete -f kube-state-metrics.yaml
 
 No persistent state — kube-state-metrics only ever reflects the cluster's current state, read
 live from the Kubernetes API.
+
+## Argo CD
+
+Argo CD v3.5.7 keeps the cluster in sync with `main`
+([ADR-0007](../../../docs/decisions/0007-argocd-gitops-on-k3s.md)). `argocd/` holds the pinned
+upstream install, the `/argocd` ingress, and the root Application `homelab`, which owns every
+Application in `argocd/apps/`: `nexus`, `bankml`, and `argocd` itself.
+
+UI: `http://k8s-01/argocd`, on the LAN and tailnet only. User `admin`; the first password is in a
+Secret that the install creates, read on `k8s-01`:
+
+```bash
+sudo k3s kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+```
+
+Change it in the UI (User Info, Update Password), then delete that Secret.
+
+Bootstrap, once, on a fresh cluster. Server-side apply because the CRDs exceed the client-side
+annotation limit; the second apply is needed because the root Application cannot be created until
+the CRDs exist:
+
+```bash
+cd ai-infrastructure-lab/infrastructure/homelab/k3s
+sudo k3s kubectl apply --server-side --force-conflicts -k argocd
+sudo k3s kubectl -n argocd wait --for=condition=available --timeout=600s deploy --all
+sudo k3s kubectl apply --server-side --force-conflicts -k argocd
+```
+
+After that, every change, including an Argo CD upgrade, is a commit. `kube-state-metrics.yaml`
+above is still applied by hand.

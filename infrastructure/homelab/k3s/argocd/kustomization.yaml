@@ -1,0 +1,44 @@
+# Argo CD on k3s (docs/decisions/0007). Applied by hand once to bootstrap; after that the `argocd`
+# Application (apps/argocd.yaml) keeps it in sync with this directory.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - namespace.yaml
+  # The upstream non-HA install, pinned to an exact release. Upgrading Argo CD is a commit that
+  # changes this version.
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.7/manifests/install.yaml
+  - ingress.yaml
+  - root-app.yaml
+
+patches:
+  # Served over plain HTTP under /argocd, behind the same Traefik ingress as Nexus, on the LAN and
+  # tailnet only. TLS would need a certificate for a hostname nothing outside the lab resolves.
+  - target:
+      kind: ConfigMap
+      name: argocd-cmd-params-cm
+    patch: |-
+      - op: add
+        path: /data
+        value:
+          server.insecure: "true"
+          server.basehref: /argocd
+          server.rootpath: /argocd
+  # Single sign-on and notifications are not used here; there is one operator and alerts already
+  # go through Grafana. Kept in the manifests, scaled to zero, so enabling either is one line.
+  - target:
+      kind: Deployment
+      name: argocd-dex-server
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Deployment
+      name: argocd-notifications-controller
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0

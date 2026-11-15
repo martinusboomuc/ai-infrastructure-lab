@@ -20,6 +20,7 @@ old one; the old one stays, marked as superseded.
 | [0004](0004-mlflow-registry-backups.md) | Back up the MLflow registry daily to Azure Blob with a write-only token | Accepted |
 | [0005](0005-terraform-state-in-azure.md) | Keep Terraform state in a dedicated, versioned Azure storage account | Accepted |
 | [0006](0006-grafana-notifications-as-code.md) | Provision Grafana's contact points and notification policy from files | Accepted |
+| [0007](0007-argocd-gitops-on-k3s.md) | Sync the k3s workloads from Git with Argo CD | Accepted |
 
 ## Template
 

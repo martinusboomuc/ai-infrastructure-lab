@@ -1,0 +1,20 @@
+# The drift and replay CronJobs. The Secrets they read (azure-storage, bankml-api-key) are created
+# by hand and are not in this source, so Argo CD neither tracks nor prunes them.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bankml
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/martinusboomuc/ai-infrastructure-lab.git
+    targetRevision: main
+    path: mlops/deploy/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bankml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

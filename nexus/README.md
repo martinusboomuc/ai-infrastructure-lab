@@ -82,12 +82,9 @@ Nexus runs on k3s, from the Kustomize manifests in `deploy/k8s/`. The reasoning 
 1. A push to `main` that touches `backend/` or `frontend/` builds both images and pushes them to
    GHCR, tagged with the commit's first 12 SHA characters (`.github/workflows/nexus-images.yml`).
 2. A release is a commit that sets those tags in `deploy/k8s/kustomization.yaml`.
-3. On `k8s-01`, from the repository checkout:
-
-   ```bash
-   sudo k3s kubectl apply -k nexus/deploy/k8s
-   sudo k3s kubectl -n nexus rollout status deploy/backend deploy/frontend
-   ```
+3. Argo CD's `nexus` Application applies it within about three minutes of the push
+   ([ADR-0007](../docs/decisions/0007-argocd-gitops-on-k3s.md)). Its sync and health are at
+   `http://k8s-01/argocd`. Nothing is applied by hand.
 
 Before the first apply, the Tailscale OAuth client is created once in the Tailscale admin console
 (Settings, Trust credentials) with only the `devices:core:read` scope. Its secret goes into the
