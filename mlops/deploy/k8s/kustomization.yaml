@@ -30,4 +30,4 @@ configMapGenerator:
 # release is a commit that changes this tag.
 images:
   - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
-    newTag: 24e56d9ba55b
+    newTag: 620656f98837
