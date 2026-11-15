@@ -47,7 +47,11 @@ groups:
                     type: gt
                     params: [0]
               refId: C
-        noDataState: NoData
+        # OK, not NoData: the drift gauges only exist once a run has had enough logged traffic
+        # to compare (DEFAULT_MIN_CURRENT in bankml.monitoring.drift). Until then, missing data
+        # means "nothing to judge yet", and a job that has stopped is caught by the staleness
+        # rule below instead. NoData here fired a permanent DatasourceNoData alert.
+        noDataState: OK
         execErrState: Error
         for: 5m
         labels:
