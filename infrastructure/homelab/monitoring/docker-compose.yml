@@ -21,6 +21,14 @@ services:
   pushgateway:
     image: prom/pushgateway:v1.11.0
     restart: unless-stopped
+    # Without a persistence file, a restart forgets every pushed metric, and the staleness alerts
+    # for the drift job and the backups fire until each job next runs. /pushgateway is the image's
+    # working directory and already owned by its `nobody` user, so the volume inherits that.
+    command:
+      - --persistence.file=/pushgateway/metrics.db
+      - --persistence.interval=1m
+    volumes:
+      - pushgateway-data:/pushgateway
     ports:
       - "9091:9091"
 
@@ -40,4 +48,5 @@ services:
 
 volumes:
   prometheus-data:
+  pushgateway-data:
   grafana-data:
