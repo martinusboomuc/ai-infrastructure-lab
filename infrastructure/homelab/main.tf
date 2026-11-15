@@ -10,12 +10,12 @@
 locals {
   vms = {
     k8s-01 = {
-      vm_id        = 8001
-      description  = "Single-node k3s control-plane + worker (docs/decisions/0002-proxmox-vm-layout.md)"
-      cpu_cores    = 2
-      memory_mb    = 4096
-      disk_gb      = 60
-      extra_disks  = []
+      vm_id       = 8001
+      description = "Single-node k3s control-plane + worker (docs/decisions/0002-proxmox-vm-layout.md)"
+      cpu_cores   = 2
+      memory_mb   = 4096
+      disk_gb     = 60
+      extra_disks = []
     }
     docker-01 = {
       vm_id       = 8002
@@ -51,6 +51,13 @@ resource "proxmox_virtual_environment_download_file" "cloud_image" {
   # .img instead of .qcow2 is what lets a qcow2 downloaded under the ISO content type still be
   # referenced as a disk image's file_id below. Proxmox detects the real format at import time.
   file_name = "debian-12-generic-amd64.img"
+
+  # The URL is Debian's "latest" build, which changes under the same name. With overwrite left at
+  # its default, a new upstream build changed this resource's size, forced its replacement, and
+  # through the disks' file_id forced every VM below to be destroyed and recreated. Found by a
+  # plan on 2026-11-15. The image is only the template a VM is first built from; keeping the copy
+  # already on the host is correct.
+  overwrite = false
 }
 
 resource "proxmox_virtual_environment_file" "cloud_init_user_data" {
@@ -138,5 +145,18 @@ resource "proxmox_virtual_environment_vm" "this" {
       username = var.vm_username
       keys     = [var.ssh_public_key]
     }
+  }
+
+  lifecycle {
+    # The base image and cloud-init only matter when a VM is first created. Changes to either
+    # later must not rebuild a VM that has since accumulated state (MLflow's database on
+    # docker-01, the cluster on k8s-01, metrics history on monitoring-01).
+    ignore_changes = [
+      disk[0].file_id,
+      initialization,
+    ]
+    # Any plan that would destroy one of these VMs fails instead. Rebuilding one is a deliberate
+    # act: remove this line in the same change, and say why.
+    prevent_destroy = true
   }
 }
