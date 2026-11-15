@@ -67,6 +67,19 @@ overwrite it on restart. Environment interpolation removes both problems, and wi
 thing in Grafana's database that could not be rebuilt from this repository. What is left there
 is the Nexus service account token, which is recreated by hand (nexus/README.md).
 
+Switching an existing Grafana over is not automatic. On 2026-11-15 Grafana refused to start and
+restarted in a loop with `Failed to provision alerting error="contact points: cannot change
+provenance from 'api' to 'file'"`: it will not let a file take over objects the API created. A
+throwaway Grafana with an empty database had not shown this. The fix was to stop Grafana, copy
+`grafana.db`, mark those records as file-provisioned, and start it again:
+
+```sql
+update provenance_type set provenance = 'file'
+where provenance = 'api' and record_type in ('contactPoint', 'route');
+```
+
+A fresh deploy never hits this, since nothing is created through the API first.
+
 ### Homelab infrastructure alerts
 
 `grafana/provisioning/alerting/homelab.yaml` — separate from `drift.yaml`, its own "Homelab"
