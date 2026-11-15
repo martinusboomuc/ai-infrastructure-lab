@@ -54,11 +54,13 @@ def check_drift_task(domain: str) -> dict:
     and a hand-run drift check always agree on what counts as drifted.
     """
     result = drift_module.run_drift_job(domain)
+    pushgateway_url = os.environ.get("BANKML_PUSHGATEWAY_URL")
     if result["status"] == "no_data":
+        if pushgateway_url:
+            drift_module.push_drift_heartbeat(domain, pushgateway_url)
         return result
 
     drift_module.log_drift_run(domain, result)
-    pushgateway_url = os.environ.get("BANKML_PUSHGATEWAY_URL")
     if pushgateway_url:
         drift_module.push_drift_metrics(domain, result, pushgateway_url)
     return result

@@ -39,13 +39,20 @@ import pandas as pd
 from evidently import DataDefinition, Dataset, Report
 from evidently.presets import DataDriftPreset
 from mlflow import MlflowClient
+from mlflow.exceptions import MlflowException
 
 from bankml.features.credit.prepare import feature_columns, prepare_features
 from bankml.serving.prediction_log import read_all_records
+from bankml.tracking import REFERENCE_ARTIFACT_PATH
 
 DEFAULT_PSI_THRESHOLD = (
     0.2  # industry-standard cutoff: <0.1 stable, 0.1-0.2 moderate, >0.2 significant
 )
+# Fewest logged predictions PSI is computed on. PSI bins each column into ten buckets; below
+# roughly 50 observations per bucket the per-bucket shares are noise, and the job reports drift
+# on almost every column. Found running it on the real prediction log, which held 2 records:
+# 95% of features "drifted". Below this, the run counts as having nothing to compare.
+DEFAULT_MIN_CURRENT = 500
 
 
 def load_current_from_prediction_log(domain: str) -> pd.DataFrame:
@@ -61,8 +68,23 @@ def load_current_from_prediction_log(domain: str) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def load_reference_features(domain: str) -> pd.DataFrame:
-    """The `SPLIT="train"` rows of the domain's own processed feature set."""
+def load_reference_features(domain: str, run_id: str) -> pd.DataFrame:
+    """The `SPLIT="train"` rows the production model was fit on, read from its own MLflow run
+    (`bankml.tracking.REFERENCE_ARTIFACT_PATH`, ADR-0015). This is what lets the job run on the
+    k3s cluster, which has no copy of the processed feature set.
+
+    Falls back to the local processed feature set under `BANKML_DATA_ROOT` only when the run has
+    no such artifact, which is true of models trained before it existed and not yet backfilled.
+    """
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = mlflow.artifacts.download_artifacts(
+                run_id=run_id, artifact_path=REFERENCE_ARTIFACT_PATH, dst_path=tmp_dir
+            )
+            return pd.read_parquet(path)
+    except (MlflowException, OSError):
+        if "BANKML_DATA_ROOT" not in os.environ:
+            raise
     data_root = Path(os.environ["BANKML_DATA_ROOT"])
     features_path = data_root / "processed" / domain / "features.parquet"
     df = pd.read_parquet(features_path)
@@ -70,16 +92,14 @@ def load_reference_features(domain: str) -> pd.DataFrame:
 
 
 def score_reference_with_production_model(
-    reference: pd.DataFrame, registered_model_name: str
+    reference: pd.DataFrame, registered_model_name: str, run_id: str
 ) -> pd.Series:
     """What the currently-deployed production model predicts on its own training population —
     the baseline prediction drift is measured against.
     """
-    client = MlflowClient()
-    version = client.get_model_version_by_alias(registered_model_name, "production")
     loaded = mlflow.pyfunc.load_model(f"models:/{registered_model_name}@production")
     model = loaded.unwrap_python_model().model
-    categories = mlflow.artifacts.load_dict(f"runs:/{version.run_id}/categorical_levels.json")
+    categories = mlflow.artifacts.load_dict(f"runs:/{run_id}/categorical_levels.json")
 
     columns = feature_columns(reference)
     X = prepare_features(reference, columns, categories=categories)
@@ -162,18 +182,29 @@ def compute_drift(
 
 
 def run_drift_job(
-    domain: str = "credit", threshold: float = DEFAULT_PSI_THRESHOLD
+    domain: str = "credit",
+    threshold: float = DEFAULT_PSI_THRESHOLD,
+    min_current: int = DEFAULT_MIN_CURRENT,
 ) -> dict[str, Any]:
-    reference = load_reference_features(domain)
     current = load_current_from_prediction_log(domain)
+    if len(current) < min_current:
+        return {
+            "status": "no_data",
+            "domain": domain,
+            "n_current": len(current),
+            "message": f"{len(current)} logged predictions; at least {min_current} needed",
+        }
 
-    if current.empty:
-        return {"status": "no_data", "domain": domain, "message": "no logged predictions found"}
+    registered_model_name = f"{domain}-champion"
+    version = MlflowClient().get_model_version_by_alias(registered_model_name, "production")
+    reference = load_reference_features(domain, version.run_id)
 
     columns = feature_columns(reference)
     input_drift = compute_drift(reference[columns], current[columns], threshold=threshold)
 
-    reference_scores = score_reference_with_production_model(reference, f"{domain}-champion")
+    reference_scores = score_reference_with_production_model(
+        reference, registered_model_name, version.run_id
+    )
     prediction_drift = compute_drift(
         pd.DataFrame({"score": reference_scores}), current[["score"]], threshold=threshold
     )
@@ -269,17 +300,45 @@ def push_drift_metrics(domain: str, result: dict[str, Any], pushgateway_url: str
     push_to_gateway(pushgateway_url, job=f"bankml_drift_{domain}", registry=registry)
 
 
-def main(domain: str = "credit", threshold: float = DEFAULT_PSI_THRESHOLD) -> None:
-    result = run_drift_job(domain, threshold=threshold)
+def push_drift_heartbeat(domain: str, pushgateway_url: str) -> None:
+    """Record that the job ran when there was no logged traffic to compare.
+
+    A run with nothing to compare is still a successful run. Without this, the staleness alert
+    ("BankML drift job has not run recently") fires whenever the API sees no traffic for two
+    days, which cannot be told apart from the job itself having stopped. Uses
+    `pushadd_to_gateway`, which merges into the job's metric group instead of replacing it, so
+    the last real drift values stay in place rather than vanishing because traffic stopped.
+    """
+    from prometheus_client import CollectorRegistry, Gauge, pushadd_to_gateway
+
+    registry = CollectorRegistry()
+    Gauge(
+        "bankml_drift_last_run_timestamp_seconds",
+        "Unix timestamp of the most recent successful drift run",
+        ["domain"],
+        registry=registry,
+    ).labels(domain=domain).set(time.time())
+    pushadd_to_gateway(pushgateway_url, job=f"bankml_drift_{domain}", registry=registry)
+
+
+def main(
+    domain: str = "credit",
+    threshold: float = DEFAULT_PSI_THRESHOLD,
+    min_current: int = DEFAULT_MIN_CURRENT,
+) -> None:
+    result = run_drift_job(domain, threshold=threshold, min_current=min_current)
     print(json.dumps(result, indent=2, default=str))
 
+    pushgateway_url = os.environ.get("BANKML_PUSHGATEWAY_URL")
     if result["status"] == "no_data":
+        if pushgateway_url:
+            push_drift_heartbeat(domain, pushgateway_url)
+            print(f"Pushed heartbeat to {pushgateway_url}")
         return
 
     run_id = log_drift_run(domain, result)
     print(f"\nLogged drift run {run_id}")
 
-    pushgateway_url = os.environ.get("BANKML_PUSHGATEWAY_URL")
     if pushgateway_url:
         push_drift_metrics(domain, result, pushgateway_url)
         print(f"Pushed metrics to {pushgateway_url}")
@@ -292,5 +351,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--domain", default="credit")
     parser.add_argument("--threshold", type=float, default=DEFAULT_PSI_THRESHOLD)
+    parser.add_argument("--min-current", type=int, default=DEFAULT_MIN_CURRENT)
     args = parser.parse_args()
-    main(domain=args.domain, threshold=args.threshold)
+    main(domain=args.domain, threshold=args.threshold, min_current=args.min_current)

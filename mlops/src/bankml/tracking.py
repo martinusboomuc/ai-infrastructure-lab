@@ -15,8 +15,29 @@ from pathlib import Path
 
 import mlflow
 import mlflow.pyfunc
+import pandas as pd
+from mlflow import MlflowClient
 
 from bankml.registry.pyfunc_model import ProbabilityModel
+
+# Where a run keeps the population its model was fit on. The drift job compares live traffic
+# against exactly this file, read from the production model's own run (ADR-0015), so the
+# reference always matches the model being monitored and the job needs no local data copy.
+REFERENCE_ARTIFACT_DIR = "reference"
+REFERENCE_ARTIFACT_PATH = f"{REFERENCE_ARTIFACT_DIR}/features_train.parquet"
+
+
+def log_reference(reference: pd.DataFrame, run_id: str | None = None) -> None:
+    """Log the training population as a Parquet artifact: to the active run, or to `run_id`
+    when given, which is how a model trained before this artifact existed gets one afterwards.
+    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = Path(tmp_dir) / Path(REFERENCE_ARTIFACT_PATH).name
+        reference.to_parquet(path, index=False)
+        if run_id is None:
+            mlflow.log_artifact(str(path), artifact_path=REFERENCE_ARTIFACT_DIR)
+        else:
+            MlflowClient().log_artifact(run_id, str(path), artifact_path=REFERENCE_ARTIFACT_DIR)
 
 
 def _git_sha() -> str:
@@ -47,6 +68,7 @@ def log_run(
     model_card: str,
     mlops_root: Path,
     categories: dict[str, list] | None = None,
+    reference: pd.DataFrame | None = None,
 ) -> str:
     """Log one champion/challenger run to MLflow. Returns the MLflow run ID.
 
@@ -96,6 +118,9 @@ def log_run(
                 categories_path = tmp_path / "categorical_levels.json"
                 categories_path.write_text(json.dumps(categories, indent=2))
                 mlflow.log_artifact(str(categories_path))
+
+        if reference is not None:
+            log_reference(reference)
 
         # Logged uniformly for every model type (see pyfunc_model.py's docstring) — this is what
         # keeps `model.logistic_regression`-only logging from silently dropping the scorecard's

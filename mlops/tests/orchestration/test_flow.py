@@ -100,3 +100,21 @@ def test_push_drift_metrics_is_skipped_when_no_pushgateway_is_configured(monkeyp
         drift_check_and_retrain(domain="credit")
 
     mock_push.assert_not_called()
+
+
+def test_a_heartbeat_is_pushed_when_there_is_no_data_to_compare(monkeypatch):
+    monkeypatch.setenv("BANKML_PUSHGATEWAY_URL", "http://fake-gateway:9091")
+    with (
+        patch(
+            "bankml.monitoring.drift.run_drift_job",
+            return_value={"status": "no_data", "domain": "credit", "message": "none"},
+        ),
+        patch("bankml.monitoring.drift.push_drift_heartbeat") as mock_heartbeat,
+        patch("bankml.monitoring.drift.push_drift_metrics") as mock_push,
+        patch("bankml.orchestration.flow.train_and_evaluate_task") as mock_train,
+    ):
+        drift_check_and_retrain(domain="credit")
+
+    mock_heartbeat.assert_called_once_with("credit", "http://fake-gateway:9091")
+    mock_push.assert_not_called()
+    mock_train.assert_not_called()

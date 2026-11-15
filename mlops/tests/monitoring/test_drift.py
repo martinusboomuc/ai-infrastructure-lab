@@ -12,12 +12,17 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 import pytest
+from mlflow.exceptions import MlflowException
 
 from bankml.monitoring.drift import (
     compute_drift,
     load_current_from_prediction_log,
+    load_reference_features,
+    push_drift_heartbeat,
     push_drift_metrics,
+    run_drift_job,
 )
+from bankml.tracking import log_reference
 
 
 @pytest.fixture
@@ -250,3 +255,85 @@ def test_push_drift_metrics_pushes_to_the_configured_gateway_url():
         args[0] == "http://fake-gateway:9091" or kwargs.get("gateway") == "http://fake-gateway:9091"
     )
     assert kwargs["job"] == "bankml_drift_credit"
+
+
+def test_push_drift_heartbeat_merges_only_the_last_run_timestamp():
+    with patch("prometheus_client.pushadd_to_gateway") as mock_pushadd:
+        push_drift_heartbeat("credit", "http://fake-gateway:9091")
+
+    mock_pushadd.assert_called_once()
+    args, kwargs = mock_pushadd.call_args
+    assert args[0] == "http://fake-gateway:9091"
+    assert kwargs["job"] == "bankml_drift_credit"
+    names = {m.name for m in kwargs["registry"].collect()}
+    # Only the timestamp: merged into the group, it leaves the last real drift values in place.
+    assert names == {"bankml_drift_last_run_timestamp_seconds"}
+
+
+@pytest.fixture
+def local_mlflow(tmp_path, monkeypatch):
+    import mlflow
+
+    # SQLite rather than a ./mlruns directory: MLflow 3 refuses the file store by default.
+    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", uri)
+    mlflow.set_tracking_uri(uri)
+    mlflow.create_experiment(
+        "drift-reference-test", artifact_location=(tmp_path / "artifacts").as_uri()
+    )
+    mlflow.set_experiment("drift-reference-test")
+    yield mlflow
+    mlflow.set_tracking_uri(None)
+
+
+def test_the_reference_is_read_back_from_the_model_run(
+    local_mlflow, monkeypatch, stable_population
+):
+    monkeypatch.delenv("BANKML_DATA_ROOT", raising=False)
+    with local_mlflow.start_run() as run:
+        pass
+    # Logged after the run finished, the way a model trained before this artifact existed is
+    # backfilled.
+    log_reference(stable_population, run_id=run.info.run_id)
+
+    reference = load_reference_features("credit", run.info.run_id)
+
+    pd.testing.assert_frame_equal(reference, stable_population)
+
+
+def test_the_reference_falls_back_to_the_data_root_when_the_run_has_none(
+    local_mlflow, monkeypatch, tmp_path
+):
+    with local_mlflow.start_run() as run:
+        pass
+    features_dir = tmp_path / "data" / "processed" / "credit"
+    features_dir.mkdir(parents=True)
+    pd.DataFrame({"x": [1, 2, 3], "SPLIT": ["train", "train", "test"]}).to_parquet(
+        features_dir / "features.parquet"
+    )
+    monkeypatch.setenv("BANKML_DATA_ROOT", str(tmp_path / "data"))
+
+    reference = load_reference_features("credit", run.info.run_id)
+
+    assert list(reference["x"]) == [1, 2]
+
+
+def test_a_missing_reference_raises_when_there_is_no_data_root(local_mlflow, monkeypatch):
+    monkeypatch.delenv("BANKML_DATA_ROOT", raising=False)
+    with local_mlflow.start_run() as run:
+        pass
+
+    with pytest.raises((MlflowException, OSError)):
+        load_reference_features("credit", run.info.run_id)
+
+
+def test_too_few_logged_predictions_count_as_nothing_to_compare(stable_population):
+    # Two records, as the real prediction log held: PSI on that flags nearly every column.
+    with patch(
+        "bankml.monitoring.drift.load_current_from_prediction_log",
+        return_value=stable_population.head(2),
+    ):
+        result = run_drift_job("credit", min_current=500)
+
+    assert result["status"] == "no_data"
+    assert result["n_current"] == 2

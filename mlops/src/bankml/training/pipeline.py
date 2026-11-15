@@ -158,6 +158,7 @@ def main(domain: str = "credit") -> None:
             model_card,
             mlops_root,
             categories=results["categories"],
+            reference=features_df[features_df["SPLIT"] == "train"],
         )
         print(f"\nLogged {role} to MLflow run {run_id}")
 
