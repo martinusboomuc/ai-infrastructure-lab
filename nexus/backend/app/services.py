@@ -105,6 +105,20 @@ _CATALOG: list[tuple[Service, _Check]] = [
     ),
     (
         Service(
+            "docker",
+            "Docker",
+            "Infrastructure",
+            "Docker Engine and Compose on docker-01, for what runs outside the cluster: MLflow "
+            "with its Postgres, cAdvisor, and the BankML training pipeline.",
+            [QuickLink("Architecture", _repo("docs/architecture/homelab-architecture.md"))],
+        ),
+        # Docker exports no metrics of its own here. cAdvisor is a container on this engine, so
+        # its scrape answering means the engine is running; a cAdvisor-only failure reads as
+        # Docker down, which is the cost of not running a separate engine exporter.
+        _Check(job="cadvisor"),
+    ),
+    (
+        Service(
             "tailscale",
             "Tailscale",
             "Networking",
