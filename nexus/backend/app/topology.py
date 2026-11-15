@@ -66,7 +66,7 @@ async def get_topology() -> list[TopologyNode]:
                     online=peer.online,
                     tailscale_ip=peer.tailscale_ip,
                     health=health_by_role.get(role) if role else None,
-                    links=quick_links(node_id, role, peer.tailscale_ip),
+                    links=quick_links(node_id, peer.tailscale_ip),
                 )
             )
         elif peer.os in _PERSONAL_DEVICE_OS:

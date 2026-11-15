@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from urllib.parse import urlencode
 
 # Opened by the viewer's browser, so these use the VMs' short hostnames: the home router resolves
 # them on the LAN and Tailscale's MagicDNS resolves them over the tailnet, so the same link works
@@ -26,7 +25,7 @@ MLFLOW_URL = os.environ.get("MLFLOW_URL", "http://docker-01:5000")
 # The "Homelab Overview" dashboard has no per-role template variable — every panel plots all
 # roles at once (infrastructure/homelab/monitoring/grafana/provisioning/dashboards/json/
 # homelab-overview.json) — so there's no real per-node deep link into it, only the dashboard
-# itself. Every monitored node links to the same URL rather than a fabricated, unscoped one.
+# itself, and it is offered once, on monitoring-01, rather than as a fabricated per-node link.
 _GRAFANA_DASHBOARD_URL = f"{GRAFANA_URL}/d/homelab-overview/homelab-overview"
 
 
@@ -36,19 +35,19 @@ class QuickLink:
     url: str
 
 
-def quick_links(node_id: str, role: str | None, tailscale_ip: str | None) -> list[QuickLink]:
-    """Direct links out to the real tool a node represents. `role` is the Prometheus `role`
-    label (see topology.py's `_KNOWN_HOSTS`) — present only for monitored hosts, so personal
-    devices correctly get no monitoring links at all; there's nothing to show for them.
+def quick_links(node_id: str, tailscale_ip: str | None) -> list[QuickLink]:
+    """Direct links out to the tools that run on a node. A node lists only what it hosts, so
+    the links also say where each tool lives; a node that hosts nothing linkable has none.
     """
     links: list[QuickLink] = []
 
-    if role:
+    if node_id == "monitoring-01":
+        # Grafana and Prometheus are linked from the one machine they run on. Both cover every
+        # host, and an earlier version put them on every monitored node (Prometheus as a query
+        # scoped to that node), which read as both tools running everywhere. A node's own
+        # figures are on its display in the room; the per-node query link was the cost of this.
         links.append(QuickLink("Grafana", _GRAFANA_DASHBOARD_URL))
-        # Scoped to this node's own `role` label — the one axis Prometheus's own UI can filter
-        # on directly, without needing a Grafana dashboard variable that doesn't exist.
-        query = urlencode({"g0.expr": f'up{{role="{role}"}}', "g0.tab": "1"})
-        links.append(QuickLink("Prometheus", f"{PROMETHEUS_URL}/graph?{query}"))
+        links.append(QuickLink("Prometheus", PROMETHEUS_URL))
 
     if node_id == "pve01" and tailscale_ip:
         # The Proxmox web UI only listens on the host's own address. Always its live Tailscale
