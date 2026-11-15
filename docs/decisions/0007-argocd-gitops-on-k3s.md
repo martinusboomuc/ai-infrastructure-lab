@@ -77,5 +77,7 @@ was free before this change.
   did not apply would only show in the UI.
 - **The first admin password is in a generated Secret.** It is changed once in the UI, then that
   Secret is deleted. Access is still a single local admin account.
-- **Not covered:** `kube-state-metrics` and the k3s node configuration are still applied by hand.
+- **Not covered:** the k3s node configuration (`k3s/node/`) is still installed by hand, and the
+  hand-made Secrets are outside Git by design. `kube-state-metrics` joined as a fourth workload
+  Application after the initial rollout.
   Image tags are still bumped by a commit rather than by an image-updater.

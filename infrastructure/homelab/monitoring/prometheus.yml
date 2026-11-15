@@ -46,7 +46,7 @@ scrape_configs:
         labels:
           role: docker-01
 
-  # Pod/deployment-level cluster state on k8s-01 (infrastructure/homelab/k3s/
+  # Pod/deployment-level cluster state on k8s-01 (infrastructure/homelab/k3s/kube-state-metrics/
   # kube-state-metrics.yaml) — exposed via NodePort 30080 since Prometheus runs outside the k3s
   # cluster entirely, on a separate VM; the upstream Service is ClusterIP-only and unreachable
   # from there.

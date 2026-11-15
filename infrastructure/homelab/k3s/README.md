@@ -5,8 +5,8 @@ Pod/deployment/daemonset-level cluster state for Prometheus. Closes the gap
 CPU/memory as a single Linux host, not what's actually running inside the k3s cluster on top of
 it — this is what does.
 
-`kube-state-metrics.yaml` is the upstream v2.13.0 manifest (ServiceAccount, ClusterRole,
-ClusterRoleBinding, Deployment, Service), pinned and applied directly rather than through Helm —
+`kube-state-metrics/kube-state-metrics.yaml` is the upstream v2.13.0 manifest (ServiceAccount, ClusterRole,
+ClusterRoleBinding, Deployment, Service), pinned and kept as a plain manifest rather than a Helm chart —
 matches `node_exporter`'s own explicit-versioned-artifact convention elsewhere in this repo. The
 one change from upstream: the Service is `NodePort` (fixed at `30080`), not the original headless
 `ClusterIP` — `monitoring-01` runs Prometheus outside the k3s cluster entirely, on a separate VM,
@@ -15,14 +15,10 @@ full reasoning.
 
 ## Deploying
 
-On `k8s-01`, over SSH:
+Argo CD syncs `kube-state-metrics/` from `main` (Application `kube-state-metrics` in
+`argocd/apps/`). A change to the manifest, including a version upgrade, is a commit.
 
-```bash
-cd ai-infrastructure-lab/infrastructure/homelab/k3s
-sudo k3s kubectl apply -f kube-state-metrics.yaml
-```
-
-Check it came up:
+Check it is running, on `k8s-01`:
 
 ```bash
 sudo k3s kubectl -n kube-system get pods -l app.kubernetes.io/name=kube-state-metrics
@@ -32,7 +28,7 @@ curl -s http://localhost:30080/metrics | grep kube_pod_status_phase | head -3
 
 `monitoring-01`'s Prometheus scrapes this over the LAN (`192.168.1.183:30080`, job
 `kube-state-metrics` in `infrastructure/homelab/monitoring/prometheus.yml`) — no config on this
-host beyond applying the manifest; nothing here needs touching when the scrape side changes.
+host beyond the manifest; nothing here needs touching when the scrape side changes.
 
 ## Cluster DNS
 
@@ -57,9 +53,8 @@ Nexus reads presence through the Tailscale API and reaches the other VMs by LAN 
 
 ## Tearing down
 
-```bash
-sudo k3s kubectl delete -f kube-state-metrics.yaml
-```
+Delete `argocd/apps/kube-state-metrics.yaml` and commit. The Application is pruned, and its
+resources are removed with it.
 
 No persistent state — kube-state-metrics only ever reflects the cluster's current state, read
 live from the Kubernetes API.
@@ -92,8 +87,8 @@ sudo k3s kubectl -n argocd wait --for=condition=available --timeout=600s deploy 
 sudo k3s kubectl apply --server-side --force-conflicts -k argocd
 ```
 
-After that, every change, including an Argo CD upgrade, is a commit. `kube-state-metrics.yaml`
-above is still applied by hand.
+After that, every change, including an Argo CD upgrade, is a commit. Only the k3s node
+configuration in `node/` and the hand-made Secrets stay outside Git.
 
 Prometheus on `monitoring-01` scrapes the application controller on NodePort `30082`
 (`argocd/metrics-nodeport.yaml`, job `argocd`). The upstream install's NetworkPolicy only admits
