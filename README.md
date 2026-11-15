@@ -92,7 +92,7 @@ The roadmap ends with a local LLM copilot on the host's unused GPU: [nexus/READM
 
 ## How the work is done
 
-- **Decisions:** 20 ADRs across the lab and BankML, each written before or alongside the change
+- **Decisions:** 21 ADRs across the lab and BankML, each written before or alongside the change
   it justifies.
 - **CI/CD:** GitHub Actions lints and tests every pull request that touches BankML (30 pytest
   modules), and builds, pushes and deploys the serving image. A second workflow builds the Nexus
@@ -106,8 +106,9 @@ The roadmap ends with a local LLM copilot on the host's unused GPU: [nexus/READM
 
 - The homelab is a single consumer machine with no RAID. Nothing irreplaceable lives only on it:
   BankML's data remote and model artifacts are on Azure, and the MLflow registry is dumped there
-  daily ([ADR-0004](docs/decisions/0004-mlflow-registry-backups.md)). Terraform state, Grafana's
-  database and the cluster's hand-made Secrets are not backed up yet.
+  daily ([ADR-0004](docs/decisions/0004-mlflow-registry-backups.md)). Terraform state is in a
+  versioned Azure account ([ADR-0005](docs/decisions/0005-terraform-state-in-azure.md)).
+  Grafana's database and the cluster's hand-made Secrets are not backed up yet.
 - The KVM boot-parameter fix reduces the guest panic rate rather than eliminating it. An
   occasional VM still needs one restart after a fresh host boot.
 - The LAN has no static addressing plan, no firewall rules beyond "nothing exposed publicly", and

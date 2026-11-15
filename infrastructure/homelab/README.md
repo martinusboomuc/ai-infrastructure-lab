@@ -47,10 +47,23 @@ None of these are things Terraform can do for you — they're one-time setup on 
 cp terraform.tfvars.example terraform.tfvars
 # edit terraform.tfvars with real values from the steps above
 
+az login                      # the state backend authenticates through this
 terraform init
 terraform plan
 terraform apply -parallelism=1
 ```
+
+**State is in Azure, not on this machine** ([ADR-0005](../../docs/decisions/0005-terraform-state-in-azure.md)):
+`homelab-tfstate-rg/homelabtfstateboom/tfstate/homelab.tfstate`. The account keeps every
+previous version of the state and soft-deletes for 30 days, and the blob lease locks the state
+for the length of each plan or apply. To recover an earlier version, list them with
+`az storage blob list --account-name homelabtfstateboom --container-name tfstate --include v
+--auth-mode key -o table` and download one with `--version-id`.
+
+**The VMs cannot be destroyed by a plan.** Each has `prevent_destroy`, and changes to the base
+image or cloud-init are ignored once a VM exists. Debian's `latest` image changing upstream used
+to force every VM to be rebuilt; a plan on 2026-11-15 showed it would have. Rebuilding a VM is a
+deliberate change to `main.tf`, not a side effect.
 
 **Use `-parallelism=1` on `apply`.** All three VMs import their disk from the same source image
 onto the same storage; Proxmox holds an exclusive lock during that import, so creating them
@@ -114,4 +127,6 @@ covered now; per-service alerting beyond BankML's own drift job is still open.
 terraform destroy
 ```
 
-Destroys exactly the three VMs this module created — it has no reach outside its own state file.
+Refused while `prevent_destroy` is set on the VMs, which is the intent. Tearing down means
+removing that line first, in a commit that says why. It destroys exactly the three VMs this
+module created and has no reach outside its own state.
