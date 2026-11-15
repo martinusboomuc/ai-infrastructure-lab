@@ -36,9 +36,15 @@ def _valid_applicant():
     }
 
 
+REPLAY_KEY = "r" * 40
+PROMETHEUS_KEY = "p" * 40
+AUTH = {"Authorization": f"Bearer {REPLAY_KEY}"}
+
+
 @pytest.fixture
 def client(monkeypatch, tmp_path):
     monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("BANKML_API_KEYS", f"replay:{REPLAY_KEY},prometheus:{PROMETHEUS_KEY}")
 
     def _fake_load_production_model():
         app_module.state.model = _FakeModel()
@@ -70,6 +76,7 @@ def test_predict_scores_an_applicant_with_no_history(client):
     response = client.post(
         "/predict/credit",
         json={"applicant_id": 1, "applicant": _valid_applicant()},
+        headers=AUTH,
     )
     assert response.status_code == 200
     body = response.json()
@@ -87,6 +94,7 @@ def test_predict_rejects_an_applicant_outside_the_request_contract(client):
     response = client.post(
         "/predict/credit",
         json={"applicant_id": 1, "applicant": bad_applicant},
+        headers=AUTH,
     )
     assert response.status_code == 422
 
@@ -99,6 +107,7 @@ def test_predict_rejects_a_malformed_history_row(client):
             "applicant": _valid_applicant(),
             "bureau": [{"SK_ID_CURR": 1, "SK_ID_BUREAU": 10}],  # missing required columns
         },
+        headers=AUTH,
     )
     assert response.status_code == 422
 
@@ -114,7 +123,9 @@ def _logged_records(tmp_path):
 
 
 def test_predict_logs_live_traffic_by_default(client, tmp_path):
-    client.post("/predict/credit", json={"applicant_id": 1, "applicant": _valid_applicant()})
+    client.post(
+        "/predict/credit", json={"applicant_id": 1, "applicant": _valid_applicant()}, headers=AUTH
+    )
 
     assert _logged_records(tmp_path)[-1]["traffic_source"] == "live"
 
@@ -123,7 +134,7 @@ def test_predict_logs_replayed_traffic_as_replay(client, tmp_path):
     response = client.post(
         "/predict/credit",
         json={"applicant_id": 1, "applicant": _valid_applicant()},
-        headers={"X-Traffic-Source": "replay"},
+        headers={**AUTH, "X-Traffic-Source": "replay"},
     )
 
     assert response.status_code == 200
@@ -134,7 +145,54 @@ def test_predict_rejects_an_unknown_traffic_source(client):
     response = client.post(
         "/predict/credit",
         json={"applicant_id": 1, "applicant": _valid_applicant()},
-        headers={"X-Traffic-Source": "something-else"},
+        headers={**AUTH, "X-Traffic-Source": "something-else"},
     )
 
     assert response.status_code == 422
+
+
+def test_predict_refuses_a_request_without_a_key(client):
+    response = client.post(
+        "/predict/credit", json={"applicant_id": 1, "applicant": _valid_applicant()}
+    )
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
+def test_predict_refuses_a_wrong_key(client):
+    response = client.post(
+        "/predict/credit",
+        json={"applicant_id": 1, "applicant": _valid_applicant()},
+        headers={"Authorization": "Bearer " + "x" * 40},
+    )
+
+    assert response.status_code == 401
+
+
+def test_predict_logs_which_client_made_the_request(client, tmp_path):
+    client.post(
+        "/predict/credit",
+        json={"applicant_id": 1, "applicant": _valid_applicant()},
+        headers={"Authorization": f"Bearer {PROMETHEUS_KEY}"},
+    )
+
+    assert _logged_records(tmp_path)[-1]["client"] == "prometheus"
+
+
+def test_metrics_needs_a_key_and_health_does_not(client):
+    assert client.get("/metrics").status_code == 401
+    assert client.get("/metrics", headers=AUTH).status_code == 200
+    assert client.get("/health").status_code == 200
+
+
+def test_protected_endpoints_fail_closed_without_configured_keys(client):
+    app_module.require_client.keys = {}
+
+    response = client.post(
+        "/predict/credit",
+        json={"applicant_id": 1, "applicant": _valid_applicant()},
+        headers=AUTH,
+    )
+
+    assert response.status_code == 503

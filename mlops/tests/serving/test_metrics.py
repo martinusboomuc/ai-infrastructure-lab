@@ -46,9 +46,13 @@ def _reset_metrics():
     yield
 
 
+PROMETHEUS_KEY = "p" * 40
+
+
 @pytest.fixture
 def client(monkeypatch, tmp_path):
     monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("BANKML_API_KEYS", f"prometheus:{PROMETHEUS_KEY}")
 
     def _fake_load_production_model():
         app_module.state.model = _FakeModel()
@@ -66,7 +70,11 @@ def client(monkeypatch, tmp_path):
         ],
     )
 
-    with TestClient(app_module.app) as test_client:
+    # Every request carries the key, as Prometheus's scrape does (ADR-0017); the auth checks
+    # themselves are in test_app.py.
+    with TestClient(
+        app_module.app, headers={"Authorization": f"Bearer {PROMETHEUS_KEY}"}
+    ) as test_client:
         yield test_client
 
 

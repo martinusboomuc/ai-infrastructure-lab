@@ -21,7 +21,7 @@ import mlflow.artifacts
 import mlflow.pyfunc
 import pandas as pd
 import pandera.errors
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from mlflow import MlflowClient
 from pydantic import BaseModel, Field
@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from bankml.evaluation.explain import compute_reason_codes
 from bankml.features.credit.pipeline import assemble_features
 from bankml.features.credit.prepare import feature_columns, prepare_features
+from bankml.serving.auth import ApiKeyAuth, load_api_keys
 from bankml.serving.metrics import PREDICTIONS, metrics_middleware, render_metrics
 from bankml.serving.prediction_log import write_prediction_record
 from bankml.validation.credit.bureau import BureauSchema
@@ -98,6 +99,7 @@ class ModelState:
 
 
 state = ModelState()
+require_client = ApiKeyAuth()
 
 
 def load_production_model() -> None:
@@ -132,6 +134,10 @@ def load_production_model() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Before the model: a malformed key table should stop startup before anything is served.
+    require_client.keys = load_api_keys()
+    if not require_client.keys:
+        logger.warning("BANKML_API_KEYS is empty: protected endpoints will answer 503")
     load_production_model()
     yield
 
@@ -169,7 +175,7 @@ def health() -> dict:
     return {"status": "ok", "model_version": state.model_version}
 
 
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(require_client)])
 def metrics() -> Response:
     return render_metrics()
 
@@ -180,6 +186,7 @@ def predict_credit(
     # Set to "replay" by bankml.monitoring.replay (ADR-0016). Logged with the prediction so
     # replayed traffic can always be told apart from real requests; anything else is refused.
     x_traffic_source: Literal["live", "replay"] = Header("live"),
+    client: str = Depends(require_client),
 ) -> dict:
     request_id = str(uuid.uuid4())
     decision_date = payload.decision_date or datetime.now(UTC)
@@ -207,6 +214,7 @@ def predict_credit(
         "threshold": state.threshold,
         "feature_vector": X.iloc[0].to_dict(),
         "traffic_source": x_traffic_source,
+        "client": client,
         "timestamp": datetime.now(UTC).isoformat(),
     }
     write_prediction_record(record, domain=DOMAIN)
@@ -219,6 +227,7 @@ def predict_credit(
         score=score,
         decision=decision,
         traffic_source=x_traffic_source,
+        client=client,
     )
 
     return {

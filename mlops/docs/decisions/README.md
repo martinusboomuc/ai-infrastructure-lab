@@ -26,6 +26,7 @@ old one; the old one stays, marked as superseded.
 | [0014](0014-training-runs-on-docker-01.md) | BankML training runs on docker-01, not the MacBook | Accepted |
 | [0015](0015-scheduled-drift-check-on-k3s.md) | Schedule the drift check as a k3s CronJob, with its reference stored on the model run | Accepted |
 | [0016](0016-replay-held-out-applicants-as-traffic.md) | Replay held-out applicants through the deployed API as monitoring traffic | Accepted |
+| [0017](0017-per-client-api-keys.md) | Require a per-client bearer key on the prediction and metrics endpoints | Accepted |
 
 ## Template
 

@@ -47,14 +47,19 @@ def test_post_request_marks_the_request_as_replay(monkeypatch):
     def fake_urlopen(request, timeout):
         seen["url"] = request.full_url
         seen["source"] = request.get_header("X-traffic-source")
+        seen["auth"] = request.get_header("Authorization")
         return _Response(200)
 
     monkeypatch.setattr(replay.urllib.request, "urlopen", fake_urlopen)
 
-    status = replay.post_request("https://api.example/", "/predict/credit", "{}")
+    status = replay.post_request("https://api.example/", "/predict/credit", "{}", "k" * 32)
 
     assert status == 200
-    assert seen == {"url": "https://api.example/predict/credit", "source": "replay"}
+    assert seen == {
+        "url": "https://api.example/predict/credit",
+        "source": "replay",
+        "auth": "Bearer " + "k" * 32,
+    }
 
 
 def test_post_request_retries_server_errors_but_not_client_errors(monkeypatch):
@@ -69,12 +74,12 @@ def test_post_request_retries_server_errors_but_not_client_errors(monkeypatch):
         return fake_urlopen
 
     monkeypatch.setattr(replay.urllib.request, "urlopen", failing(503))
-    assert replay.post_request("https://api.example", "/predict/credit", "{}") == 503
+    assert replay.post_request("https://api.example", "/predict/credit", "{}", "key") == 503
     assert len(calls) == 1 + replay._RETRIES
 
     calls.clear()
     monkeypatch.setattr(replay.urllib.request, "urlopen", failing(422))
-    assert replay.post_request("https://api.example", "/predict/credit", "{}") == 422
+    assert replay.post_request("https://api.example", "/predict/credit", "{}", "key") == 422
     assert len(calls) == 1
 
 
@@ -92,10 +97,10 @@ def fake_store(monkeypatch):
 def test_run_replay_sends_a_batch_and_advances_the_cursor(monkeypatch, fake_store):
     sent = []
     monkeypatch.setattr(
-        replay, "post_request", lambda url, endpoint, body: sent.append(body) or 200
+        replay, "post_request", lambda url, endpoint, body, key: sent.append(body) or 200
     )
 
-    result = replay.run_replay("credit", "https://api.example", batch_size=3)
+    result = replay.run_replay("credit", "https://api.example", "key", batch_size=3)
 
     assert sent == ['{"applicant_id": 3}', '{"applicant_id": 4}', '{"applicant_id": 0}']
     assert result["sent"] == 3
@@ -105,9 +110,9 @@ def test_run_replay_sends_a_batch_and_advances_the_cursor(monkeypatch, fake_stor
 
 def test_run_replay_counts_failures_and_still_moves_on(monkeypatch, fake_store):
     statuses = iter([200, 500, 422])
-    monkeypatch.setattr(replay, "post_request", lambda url, endpoint, body: next(statuses))
+    monkeypatch.setattr(replay, "post_request", lambda url, endpoint, body, key: next(statuses))
 
-    result = replay.run_replay("credit", "https://api.example", batch_size=3)
+    result = replay.run_replay("credit", "https://api.example", "key", batch_size=3)
 
     assert result["sent"] == 1
     assert result["failed"] == 2

@@ -4,7 +4,8 @@ The drift job needs at least `DEFAULT_MIN_CURRENT` logged predictions before PSI
 and the API sees almost no real traffic. This sends a daily batch of held-out applicants, built
 by a domain's own replay module (`bankml.features.credit.replay`), through the public prediction
 endpoint (ADR-0016). Every replayed request carries `X-Traffic-Source: replay`, which the API
-writes into the prediction log, so replayed and real traffic stay separable.
+writes into the prediction log, so replayed and real traffic stay separable. It authenticates with
+its own key, `BANKML_API_KEY`, which the API knows as the `replay` client (ADR-0017).
 
 The request file and a cursor live in the private `replay` blob container. The cursor records
 how far the replay has got, so a missed or repeated run neither skips nor resends applicants; at
@@ -94,14 +95,18 @@ def next_batch(lines: list[str], position: int, batch_size: int) -> tuple[list[s
     return batch, (position + len(batch)) % len(lines)
 
 
-def post_request(api_url: str, endpoint: str, body: str) -> int:
+def post_request(api_url: str, endpoint: str, body: str, api_key: str) -> int:
     """POST one request, retrying connection errors and 5xx responses. Returns the final HTTP
     status, or 0 when the API could not be reached at all.
     """
     request = urllib.request.Request(
         f"{api_url.rstrip('/')}{endpoint}",
         data=body.encode("utf-8"),
-        headers={"Content-Type": "application/json", TRAFFIC_SOURCE_HEADER: "replay"},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            TRAFFIC_SOURCE_HEADER: "replay",
+        },
         method="POST",
     )
     status = 0
@@ -119,14 +124,16 @@ def post_request(api_url: str, endpoint: str, body: str) -> int:
     return status
 
 
-def run_replay(domain: str, api_url: str, batch_size: int = DEFAULT_BATCH_SIZE) -> dict:
+def run_replay(
+    domain: str, api_url: str, api_key: str, batch_size: int = DEFAULT_BATCH_SIZE
+) -> dict:
     lines = load_requests(domain)
     position = read_cursor(domain)
     batch, next_position = next_batch(lines, position, batch_size)
 
     statuses: dict[int, int] = {}
     for body in batch:
-        status = post_request(api_url, f"/predict/{domain}", body)
+        status = post_request(api_url, f"/predict/{domain}", body, api_key)
         statuses[status] = statuses.get(status, 0) + 1
 
     sent = statuses.get(200, 0)
@@ -152,7 +159,9 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 
-    result = run_replay(args.domain, os.environ["BANKML_API_URL"], args.batch_size)
+    result = run_replay(
+        args.domain, os.environ["BANKML_API_URL"], os.environ["BANKML_API_KEY"], args.batch_size
+    )
     print(json.dumps(result, indent=2))
     if result["requested"] and result["failed"] / result["requested"] > MAX_FAILURE_RATE:
         sys.exit(1)
