@@ -205,6 +205,15 @@ merge flow.
       deliberate run on `docker-01`. Added 2026-11-14, after both drift alerts had fired
       unattended since 2026-09-23 because nothing ran the job.
 
+- [x] Traffic to monitor: a daily CronJob replays 200 held-out test-split applicants through the
+      deployed API ([ADR-0016](docs/decisions/0016-replay-held-out-applicants-as-traffic.md)),
+      an hour before the drift check. Requests are built once on `docker-01` from the raw files
+      and kept in Azure Blob, never in Git. Every replayed prediction is logged with
+      `traffic_source: replay`. Added 2026-11-15, because the API had served 2 predictions and
+      the drift check could only ever report `no_data`. First measured run, on
+      602 logged predictions: no drift, highest PSI 0.146 (`CREDIT_CARD_AMT_BALANCE_MEAN`) against
+      a 0.2 threshold.
+
 **Exit criteria — met:** injecting synthetic drift into the input stream raises an alert
 (Prometheus → Grafana → Discord, see
 [infrastructure/homelab/monitoring/README.md](../infrastructure/homelab/monitoring/README.md))

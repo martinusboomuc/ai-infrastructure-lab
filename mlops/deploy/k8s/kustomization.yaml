@@ -6,21 +6,28 @@ namespace: bankml
 resources:
   - namespace.yaml
   - drift-cronjob.yaml
+  - replay-cronjob.yaml
 
 configMapGenerator:
-  - name: drift-config
+  # Shared by every BankML job in this namespace.
+  - name: bankml-config
     literals:
       # LAN addresses: pods do not resolve tailnet names (infrastructure/homelab/k3s/README.md).
       # Port 5000 directly, not the Cloudflare Tunnel, which only the Azure Container App uses.
       - MLFLOW_TRACKING_URI=http://192.168.1.115:5000
       - BANKML_PUSHGATEWAY_URL=http://192.168.1.136:9091
+      # The public API on Azure Container Apps, which the replay job posts to (ADR-0016).
+      - BANKML_API_URL=https://bankml-credit-serving.delightfulgrass-66b6c9e3.spaincentral.azurecontainerapps.io
       # Every logged prediction comes from Azure Blob. The local log directory exists only so the
       # reader has somewhere empty to look.
       - BANKML_PREDICTION_LOG_DIR=/tmp/predictions
       - HOME=/tmp
+      # MLflow imports GitPython, which warns at length when the image has no git binary. Runs
+      # here never come from a checkout, so there is no commit for it to record.
+      - GIT_PYTHON_REFRESH=quiet
 
 # Pinned to the commit the image was built from (.github/workflows/mlops-deploy.yml). A new
 # release is a commit that changes this tag.
 images:
   - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
-    newTag: 63764db51d3f
+    newTag: 49e64a3d4cfb

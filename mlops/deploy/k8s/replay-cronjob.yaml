@@ -1,0 +1,70 @@
+# Daily replay of held-out Credit Risk applicants through the deployed API (ADR-0016), so the
+# drift check at 06:00 has logged traffic to judge. Runs an hour earlier for that reason. The
+# request file and the cursor live in the private `replay` blob container; the requests are built
+# once on docker-01 by `python -m bankml.features.credit.replay` (see README.md).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: replay-credit
+  labels:
+    app.kubernetes.io/name: bankml-replay
+spec:
+  schedule: "0 5 * * *"
+  timeZone: Europe/Lisbon
+  # Two runs at once would read the same cursor and send the same applicants twice.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # No retry: a rerun after a partial failure would resend the batch from the old cursor.
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: bankml-replay
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: replay
+              image: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
+              command:
+                - python
+                - -m
+                - bankml.monitoring.replay
+                - --domain
+                - credit
+                - --batch-size
+                - "200"
+              envFrom:
+                - configMapRef:
+                    name: bankml-config
+                - secretRef:
+                    name: azure-storage
+              resources:
+                # The whole request file (about 11 MB compressed) is held in memory.
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi

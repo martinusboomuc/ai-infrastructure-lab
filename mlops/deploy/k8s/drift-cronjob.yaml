@@ -40,7 +40,7 @@ spec:
               command: ["python", "-m", "bankml.monitoring.drift", "--domain", "credit"]
               envFrom:
                 - configMapRef:
-                    name: drift-config
+                    name: bankml-config
                 # Created by hand, never committed: see mlops/deploy/k8s/README.md.
                 - secretRef:
                     name: azure-storage
