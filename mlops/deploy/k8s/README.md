@@ -1,7 +1,7 @@
 # BankML on k3s
 
-Two daily CronJobs for Credit Risk on `k8s-01`: replayed traffic at 05:00 and the drift check at
-06:00. The reasoning is in [ADR-0015](../../docs/decisions/0015-scheduled-drift-check-on-k3s.md)
+Three daily CronJobs for Credit Risk on `k8s-01`: replayed traffic at 05:00, the drift check at
+06:00 and production performance at 06:30. The reasoning is in [ADR-0015](../../docs/decisions/0015-scheduled-drift-check-on-k3s.md)
 and [ADR-0016](../../docs/decisions/0016-replay-held-out-applicants-as-traffic.md).
 
 ## What runs
@@ -20,6 +20,13 @@ than 500 logged predictions it reports `no_data` and pushes only a heartbeat.
 --batch-size 200`. It posts the next 200 prepared requests to the API on Azure Container Apps
 with `X-Traffic-Source: replay`, and moves the cursor in the `replay` blob container.
 
+`performance-credit`, daily at 06:30, runs `python -m bankml.monitoring.delayed_performance
+--domain credit` ([ADR-0021](../../docs/decisions/0021-production-performance-on-replayed-outcomes.md)).
+It measures the production version on replayed predictions served between 37 and 7 days ago,
+against the outcomes in `replay/credit/outcomes.csv`, logs a run to `bankml-credit-monitoring`, and
+pushes `bankml_performance_*` gauges to the Pushgateway. With fewer than 500 predictions with
+known outcomes, or fewer than 25 defaults, it pushes only a heartbeat.
+
 ## Building the replay requests
 
 The requests are built from the raw Home Credit files, so this runs on `docker-01`, once, and
@@ -30,6 +37,13 @@ cursor.
 cd ~/ai-infrastructure-lab/mlops
 set -a && . ./.env && set +a
 uv run python -m bankml.features.credit.replay --output /tmp/replay/credit.jsonl.gz --upload
+```
+
+Then publish the replayed applicants' outcomes, which the performance job reads. Run it again
+whenever the requests are rebuilt:
+
+```bash
+uv run python -m bankml.monitoring.outcomes --domain credit
 ```
 
 ## Deploying

@@ -30,6 +30,7 @@ old one; the old one stays, marked as superseded.
 | [0018](0018-drift-window-and-model-version.md) | Measure drift over the last seven days, on the production model's own predictions | Accepted |
 | [0019](0019-mlflow-registry-conventions.md) | MLflow conventions, evidence on every version, and promotion against production | Accepted |
 | [0020](0020-slice-tolerance-on-roc-auc.md) | Measure slice tolerance on ROC-AUC, not PR-AUC | Accepted |
+| [0021](0021-production-performance-on-replayed-outcomes.md) | Measure production performance on replayed outcomes, with a simulated delay | Accepted |
 
 ## Template
 

@@ -1,136 +1,114 @@
-"""Delayed-label performance tests (Phase 5). Synthetic fixtures (ADR-0007's pattern) — every
-test mocks `read_all_records` and `load_ground_truth` directly, so none of this depends on real
-data, a real prediction log, or a real MLflow server.
+"""Production performance on replayed outcomes (ADR-0021). Synthetic records and outcomes, so
+none of this needs a prediction log, the outcome blob or an MLflow server.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
+import pytest
 
-from bankml.monitoring.delayed_performance import compute_delayed_performance
+from bankml.monitoring.delayed_performance import compute_performance, select_window
+from bankml.monitoring.outcomes import build_outcomes, replayed_applicant_ids
 
-MATURITY_DAYS = 540
-NOW = datetime(2026, 9, 22, tzinfo=UTC)
+NOW = datetime(2026, 11, 30, tzinfo=UTC)
+REFERENCE = {"roc_auc": 0.75, "pr_auc": 0.22}
 
 
-def _record(applicant_id: int, decision: str, score: float, days_ago: int) -> dict:
+def _record(applicant_id, score=0.1, days_ago=10, version="3", source="replay", decision="pass"):
     return {
-        "request_id": f"req-{applicant_id}",
+        "request_id": f"req-{applicant_id}-{days_ago}",
         "applicant_id": applicant_id,
         "score": score,
         "decision": decision,
+        "model_version": version,
+        "traffic_source": source,
         "timestamp": (NOW - timedelta(days=days_ago)).isoformat(),
     }
 
 
-def test_no_matured_predictions_when_everything_is_too_recent():
-    records = [_record(1, "pass", 0.1, days_ago=10)]
-    with (
-        patch("bankml.monitoring.delayed_performance.read_all_records", return_value=records),
-        patch("bankml.monitoring.delayed_performance.load_ground_truth") as mock_gt,
-    ):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
+def test_the_window_keeps_only_replayed_predictions_by_the_version_with_known_outcomes():
+    records = [
+        _record(1, days_ago=10),
+        _record(2, days_ago=3),  # outcome not known yet: served after the 7-day cut-off
+        _record(3, days_ago=60),  # before the 30-day window
+        _record(4, days_ago=10, version="1"),  # another version's prediction
+        _record(5, days_ago=10, source="live"),  # live traffic has no outcome feed
+    ]
 
-    assert result["status"] == "no_matured_predictions"
-    assert result["n_logged"] == 1
-    mock_gt.assert_not_called()  # no point loading ground truth for nothing matured yet
+    selected = select_window(records, "3", NOW, delay_days=7, window_days=30)
 
-
-def test_no_matured_predictions_when_the_log_is_empty():
-    with patch("bankml.monitoring.delayed_performance.read_all_records", return_value=[]):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
-
-    assert result["status"] == "no_matured_predictions"
-    assert result["n_logged"] == 0
+    assert [r["applicant_id"] for r in selected] == [1]
 
 
-def test_no_labeled_matured_predictions_when_applicant_ids_do_not_match_ground_truth():
-    records = [_record(999_001, "pass", 0.1, days_ago=600)]  # matured, but a synthetic test ID
-    ground_truth = pd.Series({1: 0, 2: 1}, name="TARGET")
-    with (
-        patch("bankml.monitoring.delayed_performance.read_all_records", return_value=records),
-        patch("bankml.monitoring.delayed_performance.load_ground_truth", return_value=ground_truth),
-    ):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
+def _scored(n=1000, separation=1.5, seed=0):
+    """Predictions where defaulters score higher by `separation` standard deviations."""
+    rng = np.random.default_rng(seed)
+    outcome = (rng.random(n) < 0.1).astype(int)
+    raw = rng.normal(size=n) + separation * outcome
+    score = 1 / (1 + np.exp(-raw))
+    threshold = np.quantile(score, 0.9)
+    records = [
+        _record(i, score=float(s), decision="flag" if s >= threshold else "pass")
+        for i, s in enumerate(score)
+    ]
+    return records, pd.Series(outcome, index=range(n))
 
-    assert result["status"] == "no_labeled_matured_predictions"
-    assert result["n_matured"] == 1
 
+def test_a_model_that_ranks_as_well_as_on_test_is_not_degraded():
+    records, outcomes = _scored(separation=1.5)
 
-def test_a_correct_flag_counts_as_a_true_positive():
-    records = [_record(1, "flag", 0.9, days_ago=600)]
-    ground_truth = pd.Series({1: 1}, name="TARGET")  # actually defaulted — flagging was right
-    with (
-        patch("bankml.monitoring.delayed_performance.read_all_records", return_value=records),
-        patch("bankml.monitoring.delayed_performance.load_ground_truth", return_value=ground_truth),
-    ):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
+    result = compute_performance(records, outcomes, REFERENCE)
 
     assert result["status"] == "ok"
-    assert result["true_positive"] == 1
-    assert result["false_negative"] == 0
-    assert result["accuracy"] == 1.0
+    assert result["n_labeled"] == 1000
+    assert result["alert_rate"] == pytest.approx(0.1, abs=0.01)
+    assert result["roc_auc"] > 0.8
+    assert result["degraded"] is False
+    tp, fn = result["true_positive"], result["false_negative"]
+    assert result["recall"] == pytest.approx(tp / (tp + fn))
 
 
-def test_a_missed_default_counts_as_a_false_negative():
-    records = [_record(1, "pass", 0.05, days_ago=600)]
-    ground_truth = pd.Series({1: 1}, name="TARGET")  # defaulted, but the model said pass
-    with (
-        patch("bankml.monitoring.delayed_performance.read_all_records", return_value=records),
-        patch("bankml.monitoring.delayed_performance.load_ground_truth", return_value=ground_truth),
-    ):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
+def test_a_model_that_no_longer_ranks_is_degraded():
+    records, outcomes = _scored(separation=0.0)
 
-    assert result["status"] == "ok"
-    assert result["false_negative"] == 1
-    assert result["recall"] == 0.0
+    result = compute_performance(records, outcomes, REFERENCE)
+
+    assert result["roc_auc_drop"] > 0.05
+    assert result["degraded"] is True
 
 
-def test_only_matured_and_labeled_predictions_are_counted_not_the_rest():
-    records = [
-        _record(1, "flag", 0.9, days_ago=600),  # matured + labeled
-        _record(2, "pass", 0.1, days_ago=5),  # too recent
-        _record(3, "pass", 0.1, days_ago=600),  # matured, but no ground truth
-    ]
-    ground_truth = pd.Series({1: 1}, name="TARGET")
-    with (
-        patch("bankml.monitoring.delayed_performance.read_all_records", return_value=records),
-        patch("bankml.monitoring.delayed_performance.load_ground_truth", return_value=ground_truth),
-    ):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
+def test_too_few_outcomes_is_reported_not_measured():
+    records, outcomes = _scored(n=200)
 
-    assert result["n_logged"] == 3
-    assert result["n_matured"] == 2
-    assert result["n_labeled"] == 1
+    result = compute_performance(records, outcomes, REFERENCE)
 
-
-def test_pr_auc_and_roc_auc_included_when_both_classes_are_present():
-    records = [
-        _record(1, "flag", 0.9, days_ago=600),
-        _record(2, "pass", 0.1, days_ago=600),
-    ]
-    ground_truth = pd.Series({1: 1, 2: 0}, name="TARGET")
-    with (
-        patch("bankml.monitoring.delayed_performance.read_all_records", return_value=records),
-        patch("bankml.monitoring.delayed_performance.load_ground_truth", return_value=ground_truth),
-    ):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
-
-    assert "pr_auc" in result
-    assert "roc_auc" in result
-
-
-def test_pr_auc_is_omitted_not_faked_when_only_one_class_is_present():
-    records = [_record(1, "flag", 0.9, days_ago=600)]
-    ground_truth = pd.Series({1: 1}, name="TARGET")
-    with (
-        patch("bankml.monitoring.delayed_performance.read_all_records", return_value=records),
-        patch("bankml.monitoring.delayed_performance.load_ground_truth", return_value=ground_truth),
-    ):
-        result = compute_delayed_performance("credit", MATURITY_DAYS, as_of=NOW)
-
-    assert "pr_auc" not in result
+    assert result["status"] == "insufficient_outcomes"
     assert "roc_auc" not in result
+
+
+def test_predictions_without_a_published_outcome_are_not_counted():
+    records, outcomes = _scored()
+    records.append(_record(999_999, score=0.99, decision="flag"))
+
+    result = compute_performance(records, outcomes, REFERENCE)
+
+    assert result["n_in_window"] == 1001
+    assert result["n_labeled"] == 1000
+
+
+def test_outcomes_cover_only_replayed_applicants_with_a_known_target():
+    config = {"entity_key": "SK_ID_CURR", "target": "TARGET"}
+    features = pd.DataFrame({"SK_ID_CURR": [1, 2, 3, 4], "TARGET": [0, 1, None, 1]})
+    ids = replayed_applicant_ids(
+        ['{"applicant_id": 1}', '{"applicant_id": 2}', '{"applicant_id": 3}']
+    )
+
+    outcomes = build_outcomes(features, ids, config)
+
+    assert outcomes.to_dict("records") == [
+        {"applicant_id": 1, "outcome": 0},
+        {"applicant_id": 2, "outcome": 1},
+    ]

@@ -197,6 +197,14 @@ merge flow.
       prediction log, and once by injecting a real historical applicant ID (`SK_ID_CURR=100002`,
       a genuine defaulter) as an artificially-aged record and confirming it was correctly scored
       as a true positive against the real ground truth.
+      **Replaced 2026-11-16** ([ADR-0021](docs/decisions/0021-production-performance-on-replayed-outcomes.md)):
+      with a 540-day maturity the job never measured anything. It now reads an outcome feed for
+      the replayed applicants from the `replay` blob container, treats a replayed prediction's
+      outcome as known 7 days after it was served, and measures only the production version's
+      predictions. It runs daily on k3s (`performance-credit`, 06:30), logs to
+      `bankml-credit-monitoring`, and pushes gauges that a Grafana rule alerts on when live
+      ROC-AUC falls more than 0.05 below test. First measurement, v1 on 1,201 replayed
+      predictions with the delay set to 0 by hand: ROC-AUC 0.782 against 0.762 on test.
 - [x] Retraining triggered by drift, routed through the Phase 3 gate — by drift, not yet a
       schedule (no cron/scheduler wired up; `make retrain-on-drift DOMAIN=credit` is run by hand
       or would need one). `bankml.orchestration.flow.drift_check_and_retrain`: runs the same

@@ -54,6 +54,10 @@ split:
 label:
   maturity_days: 540
   as_of: 2019-09-30
+  # ADR-0021: a replayed prediction's outcome counts as known this many days after it was served.
+  # A simulation of maturity_days, so production performance can be measured within the
+  # project's lifetime; live traffic has no outcome feed.
+  replay_outcome_delay_days: 7
 
 # Values with a special meaning other than their literal number. 365243 is Home Credit's
 # generic "not applicable" placeholder for a DAYS_* column, not unique to DAYS_EMPLOYED —
