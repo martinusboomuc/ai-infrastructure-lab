@@ -34,6 +34,11 @@ extruded into a solid, with its live status as the band of light under it, and e
 that is online has a link of light to the Tailscale plinth. A firing alert pulses the object it
 names red and lights a beacon in the room.
 
+The BankML API's card also shows the model it serves: the production version, its test ROC-AUC,
+and its live ROC-AUC on replayed applicants with known outcomes, or how many of the 500 needed
+have arrived (mlops ADR-0021). The backend reads them from the gauges the performance job pushes,
+and links to the "BankML Model Performance" Grafana dashboard.
+
 What it costs and does not do:
 
 - three.js adds about 330 kB gzipped. It is a separate chunk, loaded only for the room.

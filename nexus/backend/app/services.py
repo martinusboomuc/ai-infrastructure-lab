@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from app.alerts import GRAFANA_API_URL
-from app.links import GRAFANA_URL, MLFLOW_URL, QuickLink
+from app.links import GRAFANA_URL, MLFLOW_URL, MODEL_PERFORMANCE_URL, QuickLink
 from app.links import PROMETHEUS_URL as PROMETHEUS_UI_URL
 from app.prometheus import PROMETHEUS_URL
 from app.tailscale import get_tailnet_status
@@ -45,6 +45,12 @@ class Decision:
 
 
 @dataclass
+class Fact:
+    label: str
+    value: str
+
+
+@dataclass
 class Service:
     id: str
     name: str
@@ -53,6 +59,7 @@ class Service:
     links: list[QuickLink]
     decision: Decision | None = None
     status: str = "unknown"  # up | down | unknown
+    facts: list[Fact] = field(default_factory=list)
 
 
 @dataclass
@@ -228,6 +235,7 @@ _CATALOG: list[tuple[Service, _Check]] = [
             "Credit-risk scoring API on Azure Container Apps. Scales to zero when idle, so the "
             "first request after a pause is slow.",
             [
+                QuickLink("Model performance", MODEL_PERFORMANCE_URL),
                 QuickLink("API docs", f"{BANKML_API_URL}/docs"),
                 QuickLink("Project", f"{REPO_URL}/tree/main/mlops"),
             ],
@@ -335,6 +343,44 @@ async def _tailscale_ok() -> bool:
     return True
 
 
+# The gauges BankML's performance job pushes (mlops/src/bankml/monitoring/delayed_performance.py).
+_PERFORMANCE_QUERY = (
+    '{__name__=~"bankml_performance_(test_roc_auc|roc_auc|n_labeled|measured)", domain="credit"}'
+)
+# DEFAULT_MIN_LABELED in the performance job: below it, nothing is measured yet.
+_MIN_LABELED = 500
+
+
+def model_facts(samples: dict[str, tuple[str, float]]) -> list[Fact]:
+    """What the BankML API card says about the model it serves, from the performance gauges:
+    metric name -> (model_version, value). Empty when the job has never pushed.
+    """
+    if "test_roc_auc" not in samples:
+        return []
+    version, test_roc_auc = samples["test_roc_auc"]
+    facts = [Fact("Production model", f"v{version}"), Fact("Test ROC-AUC", f"{test_roc_auc:.3f}")]
+    if samples.get("measured", ("", 0.0))[1] == 1 and "roc_auc" in samples:
+        facts.append(Fact("Live ROC-AUC", f"{samples['roc_auc'][1]:.3f}"))
+    else:
+        n_labeled = int(samples.get("n_labeled", ("", 0.0))[1])
+        facts.append(Fact("Live ROC-AUC", f"waiting for outcomes, {n_labeled} of {_MIN_LABELED}"))
+    return facts
+
+
+async def _performance_samples(client: httpx.AsyncClient) -> dict[str, tuple[str, float]]:
+    response = await client.get(
+        f"{PROMETHEUS_URL}/api/v1/query", params={"query": _PERFORMANCE_QUERY}
+    )
+    response.raise_for_status()
+    return {
+        row["metric"]["__name__"].removeprefix("bankml_performance_"): (
+            row["metric"].get("model_version", ""),
+            float(row["value"][1]),
+        )
+        for row in response.json()["data"]["result"]
+    }
+
+
 async def get_services(discord_links: list[QuickLink]) -> list[Service]:
     async with httpx.AsyncClient(timeout=5.0) as client:
         try:
@@ -355,6 +401,10 @@ async def get_services(discord_links: list[QuickLink]) -> list[Service]:
             return "unknown"
 
         statuses = await asyncio.gather(*(status(check) for _, check in _CATALOG))
+        try:
+            bankml_facts = model_facts(await _performance_samples(client))
+        except (httpx.HTTPError, KeyError, ValueError):
+            bankml_facts = []
 
     services = []
     for (service, _), service_status in zip(_CATALOG, statuses, strict=True):
@@ -368,6 +418,7 @@ async def get_services(discord_links: list[QuickLink]) -> list[Service]:
                 links,
                 service.decision,
                 service_status,
+                bankml_facts if service.id == "bankml-api" else [],
             )
         )
     return services

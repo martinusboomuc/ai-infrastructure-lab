@@ -39,6 +39,12 @@ export interface Decision {
   adr: QuickLink;
 }
 
+// A live value the backend reads for a service, such as the BankML model's ROC-AUC.
+export interface Fact {
+  label: string;
+  value: string;
+}
+
 export interface Service {
   id: string;
   name: string;
@@ -47,6 +53,7 @@ export interface Service {
   links: QuickLink[];
   decision: Decision | null;
   status: "up" | "down" | "unknown";
+  facts: Fact[];
 }
 
 export async function fetchServices(): Promise<Service[]> {

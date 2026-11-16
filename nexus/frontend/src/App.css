@@ -319,6 +319,28 @@
   color: #cbd5e1;
 }
 
+.service-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.service-fact {
+  display: contents;
+}
+
+.service-fact dt {
+  color: #94a3b8;
+}
+
+.service-fact dd {
+  margin: 0;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
 .service-decision {
   font-size: 12px;
   line-height: 1.45;

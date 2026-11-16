@@ -27,6 +27,9 @@ MLFLOW_URL = os.environ.get("MLFLOW_URL", "http://docker-01:5000")
 # homelab-overview.json) — so there's no real per-node deep link into it, only the dashboard
 # itself, and it is offered once, on monitoring-01, rather than as a fabricated per-node link.
 _GRAFANA_DASHBOARD_URL = f"{GRAFANA_URL}/d/homelab-overview/homelab-overview"
+# BankML's production performance and drift, one dashboard for the whole model
+# (mlops ADR-0021).
+MODEL_PERFORMANCE_URL = f"{GRAFANA_URL}/d/bankml-model-performance/bankml-model-performance"
 
 
 @dataclass

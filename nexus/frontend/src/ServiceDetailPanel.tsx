@@ -34,6 +34,17 @@ export function ServiceDetailPanel({
 
       <p className="service-description">{service.description}</p>
 
+      {service.facts.length > 0 && (
+        <dl className="service-facts">
+          {service.facts.map((fact) => (
+            <div key={fact.label} className="service-fact">
+              <dt>{fact.label}</dt>
+              <dd>{fact.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
       {service.decision && (
         <div className="service-decision">
           <span className="service-decision-label">Chosen over</span>{" "}
