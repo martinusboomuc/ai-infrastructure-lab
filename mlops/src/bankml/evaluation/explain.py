@@ -28,7 +28,9 @@ def compute_reason_codes(
 
     if model_type == "scorecard":
         X_woe = model.binning_process.transform(sample)
-        explainer = shap.LinearExplainer(model.logistic_regression, X_woe)
+        # Against the training population, not the sample: serving explains a single row, and a
+        # linear explainer whose background is that same row attributes zero to every feature.
+        explainer = shap.LinearExplainer(model.logistic_regression, model.reference_woe)
         shap_values = explainer.shap_values(X_woe)
         feature_names = list(sample.columns)
     elif model_type == "lightgbm":

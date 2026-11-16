@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from bankml.evaluation.explain import compute_reason_codes
 from bankml.training.scorecard import fit_scorecard
 
 
@@ -34,3 +35,16 @@ def test_bins_are_not_refit_when_scoring_a_distribution_shifted_dataset():
 
     after = model.binning_process.transform(X_train)
     assert np.allclose(before, after)
+
+
+def test_a_single_applicant_gets_non_zero_reason_codes():
+    # Serving explains one row at a time. With that row as its own background every
+    # contribution was exactly zero; the training population is the reference instead.
+    X_train, y_train = _synthetic_data()
+    model = fit_scorecard(X_train, y_train)
+    applicant = pd.DataFrame({"x1": [2.5]})
+
+    [reason] = compute_reason_codes(model, "scorecard", applicant, sample_size=1)
+
+    assert reason["contributions"][0]["feature"] == "x1"
+    assert reason["contributions"][0]["shap_value"] > 0

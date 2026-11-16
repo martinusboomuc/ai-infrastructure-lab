@@ -15,9 +15,18 @@ class ScorecardModel:
     """A fitted WoE-binning + logistic-regression scorecard, with a LightGBM-compatible
     `predict_proba` so both model types are interchangeable to the evaluation step."""
 
-    def __init__(self, binning_process: BinningProcess, logistic_regression: LogisticRegression):
+    def __init__(
+        self,
+        binning_process: BinningProcess,
+        logistic_regression: LogisticRegression,
+        reference_woe: pd.DataFrame,
+    ):
         self.binning_process = binning_process
         self.logistic_regression = logistic_regression
+        # Mean WoE per feature over the training rows: the population a reason code is measured
+        # against. Kept with the model because serving explains one applicant at a time and has
+        # no training data to compare with.
+        self.reference_woe = reference_woe
 
     def predict_proba(self, X: pd.DataFrame):
         X_woe = self.binning_process.transform(X)
@@ -43,4 +52,5 @@ def fit_scorecard(
     logistic_regression = LogisticRegression(max_iter=1000)
     logistic_regression.fit(X_woe, y_train)
 
-    return ScorecardModel(binning_process, logistic_regression)
+    reference_woe = X_woe.mean().to_frame().T
+    return ScorecardModel(binning_process, logistic_regression, reference_woe)
