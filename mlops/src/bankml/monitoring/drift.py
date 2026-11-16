@@ -44,7 +44,7 @@ from mlflow.exceptions import MlflowException
 
 from bankml.features.credit.prepare import feature_columns, prepare_features
 from bankml.serving.prediction_log import read_all_records
-from bankml.tracking import REFERENCE_ARTIFACT_PATH
+from bankml.tracking import REFERENCE_ARTIFACT_PATH, experiment_name
 
 DEFAULT_PSI_THRESHOLD = (
     0.2  # industry-standard cutoff: <0.1 stable, 0.1-0.2 moderate, >0.2 significant
@@ -252,7 +252,7 @@ def log_drift_run(domain: str, result: dict[str, Any]) -> str:
     """Log the drift job's result to MLflow — its own experiment, separate from training runs,
     so a drift history is queryable on its own timeline.
     """
-    mlflow.set_experiment(f"{domain}-monitoring")
+    mlflow.set_experiment(experiment_name(domain, "monitoring"))
     with mlflow.start_run(run_name=f"{domain}-drift") as run:
         mlflow.log_params(
             {k: result[k] for k in ("window_days", "window_start", "model_version") if k in result}

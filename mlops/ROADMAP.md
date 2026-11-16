@@ -68,6 +68,14 @@ clean clone at a given DVC revision, and the leakage test is green in CI.
 **Exit criteria:** a model can only reach `Production` in the registry by passing the gate, and a
 deliberately degraded model is demonstrably rejected by it.
 
+**Correction, 2026-11-16** ([ADR-0019](docs/decisions/0019-mlflow-registry-conventions.md)):
+- The version actually in production, `credit-champion` v1, did not meet this criterion. It is
+  the LightGBM challenger, registered by hand on 2026-09-21, and it never passed the gate.
+- Since ADR-0019:
+  - every training run logs evaluation figures, its data inputs and its provenance;
+  - every gated champion is registered with that evidence, as `candidate`;
+  - a candidate replaces production only when it is not worse on test PR-AUC.
+
 ---
 
 ## Phase 4 — Serving and deployment (Credit Risk)

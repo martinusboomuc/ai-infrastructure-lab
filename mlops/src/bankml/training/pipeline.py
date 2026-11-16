@@ -35,8 +35,8 @@ from bankml.evaluation.metrics import compute_metrics
 from bankml.evaluation.slices import compute_slice_metrics
 from bankml.registry.gate import evaluate_gate
 from bankml.registry.model_card import generate_model_card
-from bankml.registry.promote import promote_to_production
-from bankml.tracking import log_run
+from bankml.registry.promote import register_and_promote
+from bankml.tracking import FIGURE_SPLITS, dvc_data_version, git_sha, log_run
 from bankml.training.gbm import fit_lightgbm
 from bankml.training.logistic import fit_logistic_regression
 from bankml.training.scorecard import fit_scorecard
@@ -73,7 +73,13 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict, domain: str) -> 
     X_train = prepare.prepare_features(train_df, feature_columns, categories=categories)
     y_train = train_df["TARGET"]
 
-    results: dict = {"models": {}, "metrics": {}, "slice_metrics": {}, "reason_codes": {}}
+    results: dict = {
+        "models": {},
+        "metrics": {},
+        "slice_metrics": {},
+        "reason_codes": {},
+        "scores": {},
+    }
 
     for role in ("champion", "challenger"):
         model_type = config["modelling"][role]
@@ -89,6 +95,7 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict, domain: str) -> 
         results["models"][role] = model
         results["metrics"][role] = {}
         results["slice_metrics"][role] = {}
+        results["scores"][role] = {}
 
         for split_name, split_df in splits.items():
             X_split = prepare.prepare_features(split_df, feature_columns, categories=categories)
@@ -101,12 +108,15 @@ def train_and_evaluate(features_df: pd.DataFrame, config: dict, domain: str) -> 
             results["slice_metrics"][role][split_name] = compute_slice_metrics(
                 split_df, y_split, y_score, config["evaluation"]
             )
+            if split_name in FIGURE_SPLITS:
+                results["scores"][role][split_name] = (y_split, y_score)
 
         explain_split = splits.get("test", train_df)
         X_explain = prepare.prepare_features(explain_split, feature_columns, categories=categories)
         results["reason_codes"][role] = compute_reason_codes(model, model_type, X_explain)
 
     results["categories"] = categories
+    results["splits"] = splits
     return results
 
 
@@ -157,8 +167,12 @@ def main(domain: str = "credit") -> None:
             results["reason_codes"][role],
             model_card,
             mlops_root,
+            config["evaluation"],
             categories=results["categories"],
             reference=features_df[features_df["SPLIT"] == "train"],
+            scores=results["scores"][role],
+            datasets=results["splits"],
+            features_path=features_path,
         )
         print(f"\nLogged {role} to MLflow run {run_id}")
 
@@ -171,8 +185,22 @@ def main(domain: str = "credit") -> None:
                 config,
             )
             if gate_result.passed:
-                version = promote_to_production(run_id, f"{domain}-champion")
-                print(f"Gate PASSED — promoted {domain}-champion v{version} to production")
+                version, decision = register_and_promote(
+                    run_id,
+                    f"{domain}-champion",
+                    role,
+                    model_type,
+                    results["metrics"][role]["test"],
+                    tags={
+                        "run_id": run_id,
+                        "git_sha": git_sha(),
+                        "dvc_data_version": dvc_data_version(mlops_root),
+                    },
+                    max_pr_auc_regression=config["evaluation"]["gate"]["max_pr_auc_regression"],
+                )
+                outcome = "promoted to production" if decision.promote else "left as candidate"
+                print(f"Gate PASSED — registered {domain}-champion v{version}, {outcome}")
+                print(f"  {decision.reason}")
             else:
                 print(f"Gate FAILED — not promoted. Reasons: {gate_result.reasons}")
 

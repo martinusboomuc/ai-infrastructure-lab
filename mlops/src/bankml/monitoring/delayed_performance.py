@@ -41,6 +41,7 @@ import yaml
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from bankml.serving.prediction_log import read_all_records
+from bankml.tracking import experiment_name
 
 
 def load_maturity_days(domain: str, mlops_root: Path) -> int:
@@ -132,7 +133,7 @@ def compute_delayed_performance(
 
 
 def log_delayed_performance_run(domain: str, result: dict[str, Any]) -> str:
-    mlflow.set_experiment(f"{domain}-monitoring")
+    mlflow.set_experiment(experiment_name(domain, "monitoring"))
     with mlflow.start_run(run_name=f"{domain}-delayed-performance") as run:
         for key, value in result.items():
             if isinstance(value, (int, float)) and not isinstance(value, bool):

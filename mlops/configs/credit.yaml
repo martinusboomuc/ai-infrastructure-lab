@@ -95,3 +95,6 @@ evaluation:
   # Provisional floor, comfortably below the champion's observed ~0.22 test PR-AUC.
   gate:
     min_pr_auc: 0.15
+    # ADR-0019: a candidate replaces production only if its test PR-AUC is at most this much
+    # lower. A bigger drop leaves it as `candidate` for a person to decide.
+    max_pr_auc_regression: 0.005

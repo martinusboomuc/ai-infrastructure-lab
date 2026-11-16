@@ -28,6 +28,7 @@ old one; the old one stays, marked as superseded.
 | [0016](0016-replay-held-out-applicants-as-traffic.md) | Replay held-out applicants through the deployed API as monitoring traffic | Accepted |
 | [0017](0017-per-client-api-keys.md) | Require a per-client bearer key on the prediction and metrics endpoints | Accepted |
 | [0018](0018-drift-window-and-model-version.md) | Measure drift over the last seven days, on the production model's own predictions | Accepted |
+| [0019](0019-mlflow-registry-conventions.md) | MLflow conventions, evidence on every version, and promotion against production | Accepted |
 
 ## Template
 
