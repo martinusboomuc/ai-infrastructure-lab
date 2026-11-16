@@ -78,6 +78,10 @@ deliberately degraded model is demonstrably rejected by it.
 - The slice check that blocked the scorecard compared PR-AUC across groups with different
   default rates. Since [ADR-0020](docs/decisions/0020-slice-tolerance-on-roc-auc.md) it compares
   ROC-AUC, and the scorecard passes.
+- On 2026-11-16 the scorecard, `credit-champion` v3, was promoted to production by hand. Its
+  test PR-AUC is 0.2236 against v1's 0.2418; it was chosen for its reason codes, as ADR-0005
+  intends. v1 is kept as `previous-production`. Serving it found that its reason codes were
+  all zero for a single applicant; they are now measured against the training population.
 
 ---
 
