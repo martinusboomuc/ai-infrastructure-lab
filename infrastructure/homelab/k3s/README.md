@@ -95,3 +95,7 @@ Prometheus on `monitoring-01` scrapes the application controller on NodePort `30
 pods on that port, so `argocd/metrics-network-policy.yaml` also admits `192.168.1.136`. The Grafana rule `homelab-argocd-app-unhealthy`
 (`monitoring/grafana/provisioning/alerting/argocd.yaml`) alerts on Discord when an Application has
 not been both Synced and Healthy for 15 minutes, which is what a failed release looks like.
+
+Where the cluster's hand-made Secrets come from, how to rotate them, and how to rebuild `k8s-01`
+from nothing are in
+[the credentials and rebuild runbook](../../../docs/runbooks/credentials-and-k8s-01-rebuild.md).
