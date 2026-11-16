@@ -1,0 +1,113 @@
+apiVersion: 1
+
+# Production performance on replayed outcomes (mlops ADR-0021). The `performance-credit` CronJob
+# on k3s pushes these gauges daily at 06:30 when it has enough predictions with known outcomes.
+groups:
+  - orgId: 1
+    name: bankml-performance
+    folder: BankML
+    interval: 1m
+    rules:
+      - uid: bankml-performance-degraded
+        title: BankML production ROC-AUC below test
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # Test ROC-AUC minus live ROC-AUC for the production version.
+              expr: max by (domain, model_version) (bankml_performance_roc_auc_drop)
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              # MAX_ROC_AUC_DROP in bankml.monitoring.delayed_performance.
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.05]
+              refId: C
+        # OK, not NoData: the gauges exist only once a version has at least 500 predictions with
+        # known outcomes, about ten days after a promotion. The staleness rule below catches a job
+        # that has stopped.
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            The production model's ROC-AUC on replayed applicants with known outcomes is more than
+            0.05 below its test ROC-AUC. The `credit-performance` run in the
+            `bankml-credit-monitoring` MLflow experiment has the confusion counts and the report.
+
+      - uid: bankml-performance-job-stale
+        title: BankML performance job has not run recently
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: time() - max(bankml_performance_last_run_timestamp_seconds)
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              expression: B
+              # 2 days: one missed daily run is tolerated, two are not.
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [172800]
+              refId: C
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: >-
+            The `performance-credit` CronJob has not pushed a heartbeat in over 2 days, so nothing
+            is measuring production performance. Check the job on k8s-01 with
+            `sudo k3s kubectl -n bankml get jobs`.

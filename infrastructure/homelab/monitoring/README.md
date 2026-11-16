@@ -45,6 +45,11 @@ anything in over 2 days (silently-stopped-running is otherwise invisible with a 
 since it just keeps returning the last value forever). Both verified firing for real against a
 real drift run, not just provisioned and assumed to work.
 
+The performance job (`mlops/src/bankml/monitoring/delayed_performance.py`, mlops ADR-0021) pushes
+here the same way. `grafana/provisioning/alerting/performance.yaml` fires when the production
+model's ROC-AUC on replayed applicants with known outcomes is more than 0.05 below its test
+ROC-AUC, and when the job has not pushed a heartbeat in over 2 days.
+
 Alerts actually reach somewhere: a Discord contact point, with the default notification policy
 routed to it. Grafana's generic webhook contact point sends its own fixed JSON envelope with no
 way to reduce it to a plain-text body — confirmed by inspection (pointing a temporary contact
