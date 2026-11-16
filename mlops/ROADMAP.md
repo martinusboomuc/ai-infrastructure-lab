@@ -205,6 +205,9 @@ merge flow.
       `bankml-credit-monitoring`, and pushes gauges that a Grafana rule alerts on when live
       ROC-AUC falls more than 0.05 below test. First measurement, v1 on 1,201 replayed
       predictions with the delay set to 0 by hand: ROC-AUC 0.782 against 0.762 on test.
+      Shown in the Grafana dashboard "BankML Model Performance" and on the BankML API card in
+      Nexus. Every run pushes the production version, its test metrics and the outcome count,
+      so both show the progress before the first measurement.
 - [x] Retraining triggered by drift, routed through the Phase 3 gate — by drift, not yet a
       schedule (no cron/scheduler wired up; `make retrain-on-drift DOMAIN=credit` is run by hand
       or would need one). `bankml.orchestration.flow.drift_check_and_retrain`: runs the same

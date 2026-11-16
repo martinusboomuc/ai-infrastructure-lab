@@ -25,7 +25,9 @@ with `X-Traffic-Source: replay`, and moves the cursor in the `replay` blob conta
 It measures the production version on replayed predictions served between 37 and 7 days ago,
 against the outcomes in `replay/credit/outcomes.csv`, logs a run to `bankml-credit-monitoring`, and
 pushes `bankml_performance_*` gauges to the Pushgateway. With fewer than 500 predictions with
-known outcomes, or fewer than 25 defaults, it pushes only a heartbeat.
+known outcomes, or fewer than 25 defaults, it pushes only what is already known: the production
+version, its test metrics, the count so far and `bankml_performance_measured 0`. The Grafana
+dashboard "BankML Model Performance" shows both.
 
 ## Building the replay requests
 

@@ -112,3 +112,44 @@ def test_outcomes_cover_only_replayed_applicants_with_a_known_target():
         {"applicant_id": 1, "outcome": 0},
         {"applicant_id": 2, "outcome": 1},
     ]
+
+
+def _pushed(result):
+    from unittest.mock import patch
+
+    from bankml.monitoring.delayed_performance import push_performance_metrics
+
+    with patch("prometheus_client.push_to_gateway") as push:
+        push_performance_metrics("credit", result, "http://pushgateway:9091")
+    registry = push.call_args.kwargs["registry"]
+    return {sample.name: sample.value for metric in registry.collect() for sample in metric.samples}
+
+
+def test_a_run_without_enough_outcomes_still_publishes_what_is_known():
+    result = {
+        "status": "insufficient_outcomes",
+        "model_version": "3",
+        "test_roc_auc": 0.7469,
+        "test_pr_auc": 0.2236,
+        "n_labeled": 120,
+        "n_positive": 9,
+    }
+
+    pushed = _pushed(result)
+
+    assert pushed["bankml_performance_test_roc_auc"] == 0.7469
+    assert pushed["bankml_performance_n_labeled"] == 120
+    assert pushed["bankml_performance_measured"] == 0
+    assert "bankml_performance_roc_auc" not in pushed
+    assert "bankml_performance_last_run_timestamp_seconds" in pushed
+
+
+def test_a_measured_run_publishes_the_live_metrics():
+    records, outcomes = _scored()
+    result = {"model_version": "3", **compute_performance(records, outcomes, REFERENCE)}
+
+    pushed = _pushed(result)
+
+    assert pushed["bankml_performance_measured"] == 1
+    assert pushed["bankml_performance_roc_auc"] == result["roc_auc"]
+    assert pushed["bankml_performance_roc_auc_drop"] == result["roc_auc_drop"]

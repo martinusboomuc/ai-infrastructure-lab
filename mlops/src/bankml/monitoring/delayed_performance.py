@@ -164,9 +164,17 @@ def run_performance_job(
         "window_days": window_days,
         "window_start": since.isoformat(),
         "as_of": as_of.isoformat(),
+        "test_roc_auc": reference["roc_auc"],
+        "test_pr_auc": reference["pr_auc"],
     }
     if not records:
-        return {**window, "status": "insufficient_outcomes", "n_in_window": 0}
+        return {
+            **window,
+            "status": "insufficient_outcomes",
+            "n_in_window": 0,
+            "n_labeled": 0,
+            "n_positive": 0,
+        }
     return {**window, **compute_performance(records, load_outcomes(domain), reference)}
 
 
@@ -190,48 +198,53 @@ def log_performance_run(domain: str, result: dict[str, Any]) -> str:
         return run.info.run_id
 
 
+# Gauges pushed when present in the result. The test metrics and the counts are known on every
+# run, so a dashboard shows the production version and its progress towards the minimum sample
+# before the first measurement. The live metrics exist only once a run measured something.
+_GAUGES = (
+    ("test_roc_auc", "The production version's test ROC-AUC"),
+    ("test_pr_auc", "The production version's test PR-AUC"),
+    ("n_labeled", "Predictions with a known outcome in the window"),
+    ("n_positive", "Defaults among them"),
+    ("roc_auc", "ROC-AUC on replayed predictions with known outcomes"),
+    ("pr_auc", "PR-AUC on replayed predictions with known outcomes"),
+    ("roc_auc_drop", "Test ROC-AUC minus live ROC-AUC"),
+    ("recall", "Share of defaults the model flagged"),
+    ("alert_rate", "Share of applicants the model flagged"),
+    ("positive_rate", "Share of applicants that defaulted"),
+)
+
+
 def push_performance_metrics(domain: str, result: dict[str, Any], pushgateway_url: str) -> None:
-    """Replace the job's metric group, like drift's full push. Every gauge carries the model
-    version, so a promotion starts a new series rather than continuing the old one."""
+    """Replace the job's metric group on every run, measured or not.
+
+    Every gauge carries the model version, so after a promotion the old version's values leave
+    the group instead of standing in for the new one. A run without enough outcomes therefore
+    removes the live metrics, which is right: they would describe a version no longer measured.
+    """
     from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
     registry = CollectorRegistry()
     labels = {"domain": domain, "model_version": result["model_version"]}
-    for name, description in (
-        ("roc_auc", "ROC-AUC on replayed predictions with known outcomes"),
-        ("pr_auc", "PR-AUC on replayed predictions with known outcomes"),
-        ("test_roc_auc", "The production version's test ROC-AUC"),
-        ("roc_auc_drop", "Test ROC-AUC minus live ROC-AUC"),
-        ("recall", "Share of defaults the model flagged"),
-        ("alert_rate", "Share of applicants the model flagged"),
-        ("positive_rate", "Share of applicants that defaulted"),
-        ("n_labeled", "Predictions with a known outcome in the window"),
-    ):
-        gauge = Gauge(f"bankml_performance_{name}", description, list(labels), registry=registry)
-        gauge.labels(**labels).set(result[name])
-    _last_run_gauge(registry, domain).set_to_current_time()
-    push_to_gateway(pushgateway_url, job=f"bankml_performance_{domain}", registry=registry)
-
-
-def push_performance_heartbeat(domain: str, pushgateway_url: str) -> None:
-    """Merge only the timestamp into the group, so a run without enough outcomes proves the job
-    ran without erasing the last measured values (same reason as drift's heartbeat)."""
-    from prometheus_client import CollectorRegistry, pushadd_to_gateway
-
-    registry = CollectorRegistry()
-    _last_run_gauge(registry, domain).set_to_current_time()
-    pushadd_to_gateway(pushgateway_url, job=f"bankml_performance_{domain}", registry=registry)
-
-
-def _last_run_gauge(registry, domain: str):
-    from prometheus_client import Gauge
-
-    return Gauge(
+    for name, description in _GAUGES:
+        if isinstance(result.get(name), (int, float)):
+            gauge = Gauge(
+                f"bankml_performance_{name}", description, list(labels), registry=registry
+            )
+            gauge.labels(**labels).set(result[name])
+    Gauge(
+        "bankml_performance_measured",
+        "1 if the last run had enough outcomes to measure, else 0",
+        list(labels),
+        registry=registry,
+    ).labels(**labels).set(int(result["status"] == "ok"))
+    Gauge(
         "bankml_performance_last_run_timestamp_seconds",
         "When the performance job last ran, with or without enough outcomes",
         ["domain"],
         registry=registry,
-    ).labels(domain=domain)
+    ).labels(domain=domain).set_to_current_time()
+    push_to_gateway(pushgateway_url, job=f"bankml_performance_{domain}", registry=registry)
 
 
 def main() -> None:
@@ -259,14 +272,9 @@ def main() -> None:
     pushgateway_url = os.environ.get("BANKML_PUSHGATEWAY_URL")
     if args.model_version is not None or args.delay_days is not None:
         pushgateway_url = None
-    if result["status"] != "ok":
-        if pushgateway_url:
-            push_performance_heartbeat(args.domain, pushgateway_url)
-            print(f"Pushed heartbeat to {pushgateway_url}")
-        return
-
-    run_id = log_performance_run(args.domain, result)
-    print(f"\nLogged performance run {run_id}")
+    if result["status"] == "ok":
+        run_id = log_performance_run(args.domain, result)
+        print(f"\nLogged performance run {run_id}")
     if pushgateway_url:
         push_performance_metrics(args.domain, result, pushgateway_url)
         print(f"Pushed metrics to {pushgateway_url}")
