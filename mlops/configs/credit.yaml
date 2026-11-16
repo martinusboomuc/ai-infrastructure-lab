@@ -87,7 +87,7 @@ evaluation:
   alert_budget_fraction: 0.10 # top decile by risk score
   slices:
     - column: CODE_GENDER
-      tolerance: 0.05 # max allowed PR-AUC drop on any slice value vs. overall
+      tolerance: 0.05 # max allowed ROC-AUC drop on any slice value vs. overall (ADR-0020)
     - column: NAME_EDUCATION_TYPE
       tolerance: 0.05
   # Promotion gate (roadmap: "a promotion gate that can actually block"). Evaluates the

@@ -13,8 +13,20 @@ SLICE_METRICS = {
     "train": {
         "slices": {
             "CODE_GENDER": {
-                "M": {"n": 100, "pr_auc": 0.21, "within_tolerance": True},
-                "F": {"n": 100, "pr_auc": None, "within_tolerance": None},
+                "M": {
+                    "n": 100,
+                    "positive_rate": 0.08,
+                    "roc_auc": 0.73,
+                    "pr_auc": 0.21,
+                    "within_tolerance": True,
+                },
+                "F": {
+                    "n": 100,
+                    "positive_rate": 0.0,
+                    "roc_auc": None,
+                    "pr_auc": None,
+                    "within_tolerance": None,
+                },
             }
         }
     }
@@ -36,3 +48,5 @@ def test_model_card_reports_metrics_and_slice_status():
     assert "0.2200" in card  # PR-AUC
     assert "pass" in card  # M's within_tolerance=True
     assert "N/A (single class)" in card  # F's within_tolerance=None
+    assert "ROC-AUC=0.7300" in card
+    assert "positive rate 0.080" in card

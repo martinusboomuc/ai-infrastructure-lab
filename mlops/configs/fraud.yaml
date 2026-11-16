@@ -59,7 +59,7 @@ evaluation:
   alert_budget_fraction: 0.01 # top 1% by risk score - review-queue capacity, not a slice tolerance
   slices:
     - column: category
-      tolerance: 0.05 # max allowed PR-AUC drop on any slice value vs. overall
+      tolerance: 0.05 # max allowed ROC-AUC drop on any slice value vs. overall (ADR-0020)
   # Promotion gate (same mechanism as credit.yaml). Provisional floor.
   gate:
     min_pr_auc: 0.20

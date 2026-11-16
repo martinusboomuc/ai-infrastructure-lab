@@ -75,6 +75,9 @@ deliberately degraded model is demonstrably rejected by it.
   - every training run logs evaluation figures, its data inputs and its provenance;
   - every gated champion is registered with that evidence, as `candidate`;
   - a candidate replaces production only when it is not worse on test PR-AUC.
+- The slice check that blocked the scorecard compared PR-AUC across groups with different
+  default rates. Since [ADR-0020](docs/decisions/0020-slice-tolerance-on-roc-auc.md) it compares
+  ROC-AUC, and the scorecard passes.
 
 ---
 

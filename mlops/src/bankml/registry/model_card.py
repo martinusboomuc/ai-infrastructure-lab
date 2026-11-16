@@ -23,7 +23,14 @@ def generate_model_card(
             f"{m['expected_cost']:.1f} |"
         )
 
-    lines += ["", "## Slice metrics", ""]
+    lines += [
+        "",
+        "## Slice metrics",
+        "",
+        "The tolerance applies to the drop in ROC-AUC against overall (ADR-0020). PR-AUC is "
+        "shown with each slice's positive rate, because it moves with the base rate.",
+        "",
+    ]
     for split_name, slice_result in slice_metrics.items():
         lines.append(f"### {split_name}")
         for column, values in slice_result["slices"].items():
@@ -33,8 +40,12 @@ def generate_model_card(
                     if v["within_tolerance"] is None
                     else ("pass" if v["within_tolerance"] else "FAIL")
                 )
+                roc_auc = "N/A" if v["roc_auc"] is None else f"{v['roc_auc']:.4f}"
                 pr_auc = "N/A" if v["pr_auc"] is None else f"{v['pr_auc']:.4f}"
-                lines.append(f"- {column}={value!r} (n={v['n']}): PR-AUC={pr_auc} — {status}")
+                lines.append(
+                    f"- {column}={value!r} (n={v['n']}, positive rate {v['positive_rate']:.3f}): "
+                    f"ROC-AUC={roc_auc}, PR-AUC={pr_auc} — {status}"
+                )
 
     lines += [
         "",
