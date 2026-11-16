@@ -74,9 +74,15 @@ SSH="ssh -i $HOME/.ssh/id_ed25519_ai_lab"
 
    ```bash
    for f in infrastructure/homelab/mlflow/.env mlops/.env; do
-     CS | $SSH ops@192.168.1.115 "cd ~/ai-infrastructure-lab && read -r v && grep -v '^AZURE_STORAGE_CONNECTION_STRING=' $f > $f.new && printf 'AZURE_STORAGE_CONNECTION_STRING=%s\n' \"\$v\" >> $f.new && chmod 600 $f.new && mv $f.new $f && echo '$f updated'"
+     CS | $SSH ops@192.168.1.115 "cd ~/ai-infrastructure-lab && read -r v && grep -v '^AZURE_STORAGE_CONNECTION_STRING=' $f > $f.new && printf \"AZURE_STORAGE_CONNECTION_STRING='%s'\\n\" \"\$v\" >> $f.new && chmod 600 $f.new && mv $f.new $f && echo '$f updated'"
    done
    ```
+
+   The value is written in single quotes. A connection string contains `;`, and `mlops/.env`
+   is loaded with `set -a && . ./.env`, which would end the value at the first `;`. Docker
+   Compose strips the quotes, so the MLflow stack reads the same value. Written unquoted on
+   2026-11-16, this broke every blob read from `docker-01` with `Connection string missing
+   required connection details`.
 
 4. The backup SAS token, signed with the new key:
 
