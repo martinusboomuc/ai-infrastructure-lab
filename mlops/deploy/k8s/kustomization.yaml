@@ -7,6 +7,7 @@ resources:
   - namespace.yaml
   - drift-cronjob.yaml
   - replay-cronjob.yaml
+  - performance-cronjob.yaml
 
 configMapGenerator:
   # Shared by every BankML job in this namespace.
@@ -30,4 +31,4 @@ configMapGenerator:
 # release is a commit that changes this tag.
 images:
   - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
-    newTag: bc88fb135930
+    newTag: c6703b65f735

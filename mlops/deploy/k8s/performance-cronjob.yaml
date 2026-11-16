@@ -1,0 +1,68 @@
+# Daily production performance for Credit Risk (ADR-0021). Runs
+# `python -m bankml.monitoring.delayed_performance` from the serving image. Outcomes come from the
+# `replay` blob container and predictions from the prediction log, so the job needs no copy of the
+# feature set.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: performance-credit
+  labels:
+    app.kubernetes.io/name: bankml-performance
+spec:
+  schedule: "30 6 * * *"
+  timeZone: Europe/Lisbon
+  # A run that is still going when the next one is due is a problem worth seeing, not a reason
+  # to start a second copy against the same Pushgateway group.
+  concurrencyPolicy: Forbid
+  # If the node was down at 06:30, still run once it is back the same morning.
+  startingDeadlineSeconds: 21600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: bankml-performance
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            # The `bankml` user the serving image creates.
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: performance
+              image: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
+              command: ["python", "-m", "bankml.monitoring.delayed_performance", "--domain", "credit"]
+              envFrom:
+                - configMapRef:
+                    name: bankml-config
+                # Created by hand, never committed: see mlops/deploy/k8s/README.md.
+                - secretRef:
+                    name: azure-storage
+              resources:
+                # Measured: 655 MB peak on 1,201 logged predictions. The window reaches 37 days of
+                # the log, about 7,400 replayed predictions, so the limit leaves room.
+                requests:
+                  cpu: 250m
+                  memory: 768Mi
+                limits:
+                  memory: 1536Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                # MLflow writes the report here before uploading it.
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 1Gi
