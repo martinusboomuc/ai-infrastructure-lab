@@ -50,6 +50,12 @@ here the same way. `grafana/provisioning/alerting/performance.yaml` fires when t
 model's ROC-AUC on replayed applicants with known outcomes is more than 0.05 below its test
 ROC-AUC, and when the job has not pushed a heartbeat in over 2 days.
 
+A third provisioned dashboard, "BankML Model Performance", puts the model in one place: the
+production version and its test metrics, live ROC-AUC and PR-AUC against test, recall and alert
+rate of the logged decisions, the count of predictions with known outcomes, drift per kind, and
+the ten highest feature PSI values. Until a newly promoted version has 500 predictions with
+outcomes, about ten days, its live panels are empty and the count shows the progress.
+
 Alerts actually reach somewhere: a Discord contact point, with the default notification policy
 routed to it. Grafana's generic webhook contact point sends its own fixed JSON envelope with no
 way to reduce it to a plain-text body — confirmed by inspection (pointing a temporary contact
