@@ -34,6 +34,11 @@ services:
     # server is reached: localhost:5000 (training on this host, and the Cloudflare Tunnel, which
     # rewrites Host to it), the LAN IP, and the hostname and Tailscale address that Nexus links
     # to. The tailnet range (100.64.0.0/10) is not private, so it is refused by default.
+    # --cors-allowed-origins: the UI's own POSTs carry an Origin header, and MLflow 3 allows only
+    # localhost origins by default. Without this list every browser outside docker-01 got 403 on
+    # runs/search, which the UI showed as "Failed to load chart data" and "INTERNAL_ERROR". It
+    # names the same addresses as --allowed-hosts, plus the tunnel's public hostname, because the
+    # tunnel rewrites Host but not Origin.
     command: >
       mlflow server
       --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -43,6 +48,7 @@ services:
       --host 0.0.0.0
       --port 5000
       --allowed-hosts localhost,localhost:5000,127.0.0.1:5000,192.168.1.115:5000,docker-01:5000,docker-01.tailfb8c1f.ts.net:5000,100.127.8.10:5000
+      --cors-allowed-origins http://192.168.1.115:5000,http://docker-01:5000,http://docker-01.tailfb8c1f.ts.net:5000,http://100.127.8.10:5000,https://mlflow.homelab-boom.com
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 10s
