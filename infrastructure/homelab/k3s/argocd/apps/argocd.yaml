@@ -18,3 +18,7 @@ spec:
     automated:
       prune: false
       selfHeal: true
+    # The ApplicationSet CRD is larger than the 256 KB last-applied annotation client-side apply
+    # writes, so syncing it failed on 2026-11-15. Server-side apply keeps no such annotation.
+    syncOptions:
+      - ServerSideApply=true
