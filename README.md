@@ -61,7 +61,7 @@ Container Apps. Every decision it returns carries SHAP-derived reason codes. The
 Fraud Detection was added afterwards as the portability test. All fraud-specific logic lives in
 one config file, one feature module and one validation schema. The one change it forced in the
 core, a third model type, is documented in [ROADMAP.md](mlops/ROADMAP.md) rather than hidden.
-Twenty-one ADRs record the reasoning: [mlops/docs/decisions](mlops/docs/decisions/).
+Twenty-two ADRs record the reasoning: [mlops/docs/decisions](mlops/docs/decisions/).
 
 ## Homelab
 
@@ -94,7 +94,7 @@ The roadmap ends with a local LLM copilot on the host's unused GPU: [nexus/READM
 
 ## How the work is done
 
-- **Decisions:** 28 ADRs across the lab and BankML, each written before or alongside the change
+- **Decisions:** 29 ADRs across the lab and BankML, each written before or alongside the change
   it justifies.
 - **CI/CD:** GitHub Actions lints and tests every pull request that touches BankML (30 pytest
   modules), and builds, pushes and deploys the serving image. A second workflow builds the Nexus

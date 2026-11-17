@@ -1,6 +1,6 @@
 # ADR-0021: Measure production performance on replayed outcomes, with a simulated delay
 
-**Status:** Accepted
+**Status:** Accepted; point 4 superseded by [ADR-0022](0022-publish-known-performance-state-on-every-run.md)
 **Date:** 2026-11-16
 
 ## Context
