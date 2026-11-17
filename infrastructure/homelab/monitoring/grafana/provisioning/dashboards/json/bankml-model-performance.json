@@ -37,7 +37,9 @@
       "targets": [
         {
           "expr": "bankml_performance_test_roc_auc{domain=\"credit\"}",
-          "legendFormat": "v{{model_version}}"
+          "legendFormat": "v{{model_version}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -79,7 +81,9 @@
       "targets": [
         {
           "expr": "bankml_performance_measured{domain=\"credit\"}",
-          "legendFormat": ""
+          "legendFormat": "",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -142,7 +146,9 @@
       "targets": [
         {
           "expr": "bankml_performance_n_labeled{domain=\"credit\"}",
-          "legendFormat": ""
+          "legendFormat": "",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -195,7 +201,9 @@
       "targets": [
         {
           "expr": "bankml_performance_roc_auc{domain=\"credit\"}",
-          "legendFormat": ""
+          "legendFormat": "",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -236,7 +244,9 @@
       "targets": [
         {
           "expr": "bankml_performance_pr_auc{domain=\"credit\"}",
-          "legendFormat": ""
+          "legendFormat": "",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -278,7 +288,9 @@
       "targets": [
         {
           "expr": "bankml_performance_roc_auc_drop{domain=\"credit\"}",
-          "legendFormat": ""
+          "legendFormat": "",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -522,7 +534,9 @@
       "targets": [
         {
           "expr": "bankml_drift_dataset_drift{domain=\"credit\"}",
-          "legendFormat": "{{kind}}"
+          "legendFormat": "{{kind}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -587,7 +601,8 @@
         {
           "expr": "topk(10, bankml_drift_feature_psi{domain=\"credit\"})",
           "legendFormat": "{{feature}}",
-          "instant": true
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -643,7 +658,9 @@
       "targets": [
         {
           "expr": "bankml_performance_last_run_timestamp_seconds{domain=\"credit\"} * 1000",
-          "legendFormat": ""
+          "legendFormat": "",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -683,7 +700,9 @@
       "targets": [
         {
           "expr": "bankml_drift_last_run_timestamp_seconds{domain=\"credit\"} * 1000",
-          "legendFormat": ""
+          "legendFormat": "",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
