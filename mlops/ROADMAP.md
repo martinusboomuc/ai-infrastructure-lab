@@ -320,6 +320,18 @@ the DVC remote; no code or config changed, only the recorded hashes now match re
 - [ ] Churn and Marketing wired in as CI smoke-test fixtures
 - [ ] Operations dashboard: registered models, versions, drift status, deployment history
 - [ ] Data catalogue generated from the Pandera contracts
+- [ ] Fraud Detection served in production: gated and registered as `fraud-champion`,
+      `/predict/fraud`, and the replay, drift and performance jobs extended to it. Credit Risk is
+      the only served model today; Fraud was trained in Phase 6 and never registered.
+- [ ] Model test bench in Nexus: pick a held-out applicant or edit the fields, send it to the
+      production model through the Nexus backend (the API key stays server-side), and show the
+      score, decision and reason codes
+- [ ] Feature view per model in Nexus: the feature list, the scorecard's bins, WoE and IV,
+      LightGBM importances and drift PSI per feature. Comparing feature sets runs as logged
+      MLflow experiments that Nexus displays, not as training started from the browser.
+- [ ] Measure and reduce the serving image's memory (437 MB resident with one model, mostly
+      libraries): load SHAP only when explanations are requested, keep training-only packages
+      out of the serving image
 
 ---
 
@@ -332,6 +344,9 @@ Reassessed once Phase 6 is done, not before.
 - Terraform for the Azure footprint
 - Kubernetes as a deployment alternative
 - Graph features for AML
+- An assistant in Nexus that answers questions about features, models and metrics from MLflow
+  and the monitoring data. Worth building only once the test bench and the feature view give it
+  something to read; it adds a per-request cost.
 
 ---
 
