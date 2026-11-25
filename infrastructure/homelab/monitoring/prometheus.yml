@@ -73,9 +73,10 @@ scrape_configs:
     # that wakes it and keeps a replica billed until the idle cool-down ends: at 15s it never
     # scaled down, and cost about 10 EUR a month (2026-11-25). Hourly keeps it inside the free
     # grant. Queries over this job use last_over_time(...[2h]) or a 2h range, because an instant
-    # query only looks back 5 minutes. The timeout covers a cold start.
+    # query only looks back 5 minutes. The timeout covers a cold start, which loads both models
+    # (Credit Risk and Fraud) from MLflow and took over 60 s on 2026-11-25.
     scrape_interval: 1h
-    scrape_timeout: 60s
+    scrape_timeout: 150s
     scheme: https
     # /metrics needs the `prometheus` client key (mlops ADR-0017). The key is a file on this
     # host only, mounted by docker-compose.yml, never in the repository.
