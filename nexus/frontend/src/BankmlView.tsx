@@ -41,7 +41,13 @@ function GateNote({ version }: { version: ModelVersion }) {
   );
 }
 
-function ProductionPanel({ model, version }: { model: BankmlModel; version: ModelVersion }) {
+function ProductionPanel({
+  model,
+  version,
+}: {
+  model: BankmlModel;
+  version: ModelVersion;
+}) {
   const perf = model.monitoring.performance;
   let live: string;
   if (perf.measured === 1) {
@@ -64,7 +70,8 @@ function ProductionPanel({ model, version }: { model: BankmlModel; version: Mode
         <div className="service-fact">
           <dt>Serving</dt>
           <dd>
-            v{version.version}, {version.model_type}, registered {date(version.created_ms)}
+            v{version.version}, {version.model_type}, registered{" "}
+            {date(version.created_ms)}
           </dd>
         </div>
         <div className="service-fact">
@@ -95,54 +102,64 @@ function ProductionPanel({ model, version }: { model: BankmlModel; version: Mode
 
 function VersionTable({ versions }: { versions: ModelVersion[] }) {
   return (
-    <table className="model-versions">
-      <thead>
-        <tr>
-          <th>Version</th>
-          <th>Role</th>
-          <th>Type</th>
-          <th>Gate</th>
-          <th className="num">PR-AUC</th>
-          <th className="num">ROC-AUC</th>
-          <th className="num">Recall</th>
-          <th>Registered</th>
-        </tr>
-      </thead>
-      <tbody>
-        {versions.map((v) => (
-          <tr key={v.version}>
-            <td>
-              <a href={v.mlflow_url} target="_blank" rel="noreferrer">
-                v{v.version}
-              </a>
-            </td>
-            <td>{v.aliases.length ? v.aliases.join(", ") : "–"}</td>
-            <td>{v.model_type || "–"}</td>
-            <td>{v.gate || "–"}</td>
-            <td className="num">{fmt(v.metrics.pr_auc)}</td>
-            <td className="num">{fmt(v.metrics.roc_auc)}</td>
-            <td className="num">{pct(v.metrics.recall_at_target_fpr)}</td>
-            <td>{date(v.created_ms)}</td>
+    <div className="table-scroll">
+      <table className="model-versions">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Role</th>
+            <th>Type</th>
+            <th>Gate</th>
+            <th className="num">PR-AUC</th>
+            <th className="num">ROC-AUC</th>
+            <th className="num">Recall</th>
+            <th>Registered</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {versions.map((v) => (
+            <tr key={v.version}>
+              <td>
+                <a href={v.mlflow_url} target="_blank" rel="noreferrer">
+                  v{v.version}
+                </a>
+              </td>
+              <td>{v.aliases.length ? v.aliases.join(", ") : "–"}</td>
+              <td>{v.model_type || "–"}</td>
+              <td>{v.gate || "–"}</td>
+              <td className="num">{fmt(v.metrics.pr_auc)}</td>
+              <td className="num">{fmt(v.metrics.roc_auc)}</td>
+              <td className="num">{pct(v.metrics.recall_at_target_fpr)}</td>
+              <td>{date(v.created_ms)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 function ModelCard({ model }: { model: BankmlModel }) {
-  const production = model.versions.find((v) => v.version === model.production_version);
+  const production = model.versions.find(
+    (v) => v.version === model.production_version,
+  );
   return (
     <article className="service-card model-card">
       <div className="service-header">
         <span className="service-name">{model.title}</span>
         <span className={`service-status ${production ? "up" : "down"}`}>
           <span className={`status-dot ${production ? "up" : "down"}`} />
-          {production ? `v${production.version} in production` : "Nothing in production"}
+          {production
+            ? `v${production.version} in production`
+            : "Nothing in production"}
         </span>
       </div>
       <p className="service-description">{model.purpose}</p>
-      {model.error && <div className="graph-error">Can't read the registry: {model.error}</div>}
+      {model.error && (
+        <div className="graph-error">
+          Can't read the registry: {model.error}
+        </div>
+      )}
       {production && <ProductionPanel model={model} version={production} />}
       {model.versions.length > 0 && <VersionTable versions={model.versions} />}
     </article>
@@ -150,10 +167,15 @@ function ModelCard({ model }: { model: BankmlModel }) {
 }
 
 export function BankmlView() {
-  const { data: models, error } = usePolling(fetchBankmlModels, POLL_INTERVAL_MS);
+  const { data: models, error } = usePolling(
+    fetchBankmlModels,
+    POLL_INTERVAL_MS,
+  );
 
   if (error && !models) {
-    return <div className="graph-error">Can't reach the Nexus backend: {error}</div>;
+    return (
+      <div className="graph-error">Can't reach the Nexus backend: {error}</div>
+    );
   }
   if (!models) {
     return <div className="graph-loading">Loading models…</div>;

@@ -652,6 +652,21 @@
   color: #cbd5e1;
   padding: 4px 6px;
   border-bottom: 1px solid #1e293b;
+  white-space: nowrap;
+}
+
+.model-versions th {
+  white-space: nowrap;
+}
+
+/* The version table scrolls inside its card instead of overflowing it. */
+.table-scroll {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.model-card {
+  min-width: 0;
 }
 
 .model-versions .num {
@@ -666,11 +681,6 @@
 @media (max-width: 520px) {
   .model-grid {
     grid-template-columns: 1fr;
-  }
-
-  .model-versions {
-    display: block;
-    overflow-x: auto;
   }
 }
 
