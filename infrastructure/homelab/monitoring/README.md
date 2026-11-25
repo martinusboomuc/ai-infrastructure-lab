@@ -24,11 +24,19 @@ simplification, closed once it was noticed rather than left for later.
 Prometheus also scrapes BankML's deployed serving app directly over the public internet
 (`GET https://bankml-credit-serving.../metrics`, see `mlops/src/bankml/serving/metrics.py`), and
 a second provisioned dashboard, "BankML Serving", shows request rate by endpoint and status,
-p95 latency, and predictions by decision. That endpoint has no authentication of its own — same
-exposure the app's existing `/health` and `/predict/credit` already have — so this is scraping a
-genuinely public URL, not something inside the LAN. It will read `down` until the deployed
-Container App is rebuilt and redeployed with the `/metrics` route on it; a scale-to-zero cold
-start can also make the very first scrape after idle time-out, which is expected, not a bug.
+p95 latency, and predictions by decision. `/metrics` needs the `prometheus` client key
+(mlops ADR-0017).
+
+That job is scraped hourly, not every 15 seconds. Every scrape is a request that wakes the
+Container App and keeps a replica billed until the idle cool-down ends. At 15 seconds it never
+scaled to zero and cost about 10 EUR a month, which an Azure budget alert caught on 2026-11-25.
+The cost of hourly scrapes:
+
+- **The dashboard averages over 2 hours.** It cannot show a spike inside the hour.
+- **Counters restart from zero** whenever the app scales down, so the request and prediction
+  counts are approximate. The prediction log is the exact record.
+- **The target-down alert and Nexus read `last_over_time(up[2h])`,** because an instant `up`
+  query looks back only 5 minutes. A failed scrape shows until the next one, an hour later.
 
 This covers host-level metrics (all three VMs and the Proxmox host) and BankML's serving app.
 Two more layers sit on the same dashboard: per-container metrics on `docker-01`

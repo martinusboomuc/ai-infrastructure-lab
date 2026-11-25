@@ -25,8 +25,9 @@ groups:
               # Excludes prometheus (scrapes itself; if it's down, nothing else fires either)
               # and pushgateway (a one-shot batch job's push target — its own "nobody's pushed
               # to it" case is already covered by the BankML-drift-job-stale rule, and a
-              # Pushgateway with no active pusher is not itself down).
-              expr: up{job!~"prometheus|pushgateway"}
+              # Pushgateway with no active pusher is not itself down). last_over_time covers
+              # bankml-credit-serving, scraped only hourly: plain `up` is empty between its scrapes.
+              expr: last_over_time(up{job!~"prometheus|pushgateway"}[2h])
               instant: false
               range: true
               refId: A
@@ -64,9 +65,8 @@ groups:
             Prometheus's last scrape failed. If it's a `node-*` job, the host itself may be down
             or unreachable (check `tailscale status` and try SSH); if it's `cadvisor` or
             `kube-state-metrics`, the exporter container/pod likely crashed or was never started;
-            if it's `bankml-credit-serving`, the deployed Container App may have scaled to zero
-            (a cold start can also cause one missed scrape — this only fires after 2 consecutive
-            misses, not one).
+            if it's `bankml-credit-serving`, the hourly scrape of the deployed Container App failed,
+            and the alert stays until the next hourly scrape succeeds.
 
       - uid: homelab-cpu-high
         title: Host CPU usage high

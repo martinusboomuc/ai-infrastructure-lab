@@ -14,7 +14,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum by (path, status_code) (rate(bankml_requests_total[5m]))",
+          "expr": "sum by (path, status_code) (rate(bankml_requests_total[2h]))",
           "legendFormat": "{{path}} ({{status_code}})"
         }
       ],
@@ -27,7 +27,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, path) (rate(bankml_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, path) (rate(bankml_request_duration_seconds_bucket[2h])))",
           "legendFormat": "{{path}}"
         }
       ],
@@ -40,7 +40,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
         {
-          "expr": "sum by (domain, decision) (rate(bankml_predictions_total[5m]))",
+          "expr": "sum by (domain, decision) (rate(bankml_predictions_total[2h]))",
           "legendFormat": "{{domain}} — {{decision}}"
         }
       ],
@@ -53,7 +53,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
         {
-          "expr": "up{job=\"bankml-credit-serving\"}",
+          "expr": "last_over_time(up{job=\"bankml-credit-serving\"}[2h])",
           "legendFormat": "bankml-credit-serving"
         }
       ],
