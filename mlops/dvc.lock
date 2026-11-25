@@ -36,8 +36,8 @@ stages:
     deps:
     - path: configs/fraud.yaml
       hash: md5
-      md5: bc6bca1c7443e506771f4d29b119520b
-      size: 2877
+      md5: a8aa02befdc45afdec2ca6b7e4f26722
+      size: 3091
     - path: data/raw/fraud
       hash: md5
       md5: 0f2ff942d8a7c0790dc01705ee1419b6.dir
@@ -45,20 +45,20 @@ stages:
       nfiles: 4
     - path: src/bankml/features/fraud
       hash: md5
-      md5: 7963c4e11bde3951d2b8cdcf3a75ae4b.dir
-      size: 10508
-      nfiles: 4
+      md5: 9e0eb96443d09b256e7caee5403c5e59.dir
+      size: 18069
+      nfiles: 5
     - path: src/bankml/splitting.py
       hash: md5
       md5: 4fb29d7600301e3fe48628770f472447
       size: 2983
     - path: src/bankml/validation/fraud
       hash: md5
-      md5: 92f2b239806a382852899a30f503acf3.dir
-      size: 1806
-      nfiles: 2
+      md5: 9770f042a85ca09385fba27ca1205c2c.dir
+      size: 3100
+      nfiles: 3
     outs:
     - path: data/processed/fraud/features.parquet
       hash: md5
-      md5: 7f9e43dfec6c27187c5f58742ec783d8
-      size: 154709008
+      md5: 6cd17d9a825367f53cc395d931b805ee
+      size: 184072750
