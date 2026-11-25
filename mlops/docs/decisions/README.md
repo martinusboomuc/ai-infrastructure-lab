@@ -32,6 +32,8 @@ old one; the old one stays, marked as superseded.
 | [0020](0020-slice-tolerance-on-roc-auc.md) | Measure slice tolerance on ROC-AUC, not PR-AUC | Accepted |
 | [0021](0021-production-performance-on-replayed-outcomes.md) | Measure production performance on replayed outcomes, with a simulated delay | Accepted; point 4 superseded by [0022](0022-publish-known-performance-state-on-every-run.md) |
 | [0022](0022-publish-known-performance-state-on-every-run.md) | Publish what is known on every performance run, not only a heartbeat | Accepted |
+| [0023](0023-serve-fraud-from-the-same-api.md) | Serve Fraud from the same API, with a 30-day card history in each request | Accepted |
+| [0024](0024-promote-fraud-despite-the-home-slice.md) | Promote the Fraud champion despite the `home` slice, through a recorded override | Accepted |
 
 ## Template
 
