@@ -23,6 +23,6 @@ configMapGenerator:
 # release is a commit that changes these two tags.
 images:
   - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/nexus-backend
-    newTag: a6d2cdaa4c85
+    newTag: 2aaf2016b116
   - name: ghcr.io/martinusboomuc/ai-infrastructure-lab/nexus-frontend
-    newTag: a6d2cdaa4c85
+    newTag: 2aaf2016b116
