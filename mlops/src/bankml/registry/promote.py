@@ -10,6 +10,10 @@ is worse stays `candidate`, and promoting it is a deliberate human decision, run
 `python -m bankml.registry.promote --domain <domain> --version <n>`. Passing an absolute floor is
 not enough to replace a model that is doing better.
 
+A champion that fails the gate is not registered. Overriding the gate is possible but never
+silent: `--run-id <id> --reason "<why>"` registers that run with `gate=failed`, the gate's own
+reasons and the written reason as tags, and makes it production (ADR-0024).
+
 Uses MLflow's alias API, not the deprecated stages API. When `production` moves, the version it
 leaves is kept as `previous-production`, so a rollback is one alias change.
 """
@@ -132,14 +136,64 @@ def register_and_promote(
     return version, decision
 
 
+# Run tags copied onto a version registered by hand, so it carries the same provenance as one the
+# pipeline registered.
+_PROVENANCE_TAGS = ("role", "model_type", "git_sha", "git_dirty", "dvc_data_version")
+
+
+def promote_despite_gate(client: MlflowClient, name: str, run_id: str, reason: str) -> str:
+    """Register a champion run that failed the gate and make it production. `reason` is
+    required and kept on the version; the gate's own reasons come from the run's tags.
+    """
+    if not reason.strip():
+        raise ValueError("overriding the gate needs a written reason")
+    run = client.get_run(run_id)
+    if run.data.tags.get("gate") != "failed":
+        raise ValueError(f"run {run_id} is not a champion run that failed the gate")
+
+    metrics = run.data.metrics
+    test_metrics = {key: metrics[f"test_{key}"] for key in VERSION_METRIC_TAGS}
+    tags = run.data.tags
+    version = str(
+        mlflow.register_model(
+            f"runs:/{run_id}/model",
+            name,
+            tags={
+                **{key: tags[key] for key in _PROVENANCE_TAGS if key in tags},
+                "run_id": run_id,
+                "gate": "failed",
+                "gate_reasons": tags.get("gate_reasons", ""),
+                "promotion": f"promoted by hand despite the gate: {reason}",
+                **{f"test_{key}": f"{test_metrics[key]:.4f}" for key in VERSION_METRIC_TAGS},
+            },
+        ).version
+    )
+    description = version_description(
+        tags.get("role", "champion"), tags.get("model_type", ""), test_metrics, run_id
+    )
+    client.update_model_version(
+        name, version, description=f"{description} Failed the gate; promoted by hand: {reason}"
+    )
+    client.set_registered_model_alias(name, CANDIDATE, version)
+    set_production(client, name, version)
+    return version
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Promote a registered version to production.")
     parser.add_argument("--domain", default="credit")
-    parser.add_argument("--version", required=True)
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--version", help="A registered version, usually the candidate.")
+    target.add_argument("--run-id", help="A champion run that failed the gate. Needs --reason.")
+    parser.add_argument("--reason", default="", help="Why the gate is overridden.")
     args = parser.parse_args()
 
     name = f"{args.domain}-champion"
     client = MlflowClient()
+    if args.run_id:
+        version = promote_despite_gate(client, name, args.run_id, args.reason)
+        print(f"{name} v{version} registered from run {args.run_id} and is now production")
+        return
     client.get_model_version(name, args.version)  # Fails clearly if the version does not exist.
     set_production(client, name, args.version)
     client.set_model_version_tag(name, args.version, "promotion", "promoted by hand")

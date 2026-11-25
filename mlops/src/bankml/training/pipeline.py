@@ -23,10 +23,12 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import os
 from pathlib import Path
 from types import ModuleType
 
+import mlflow
 import pandas as pd
 import yaml
 
@@ -184,6 +186,11 @@ def main(domain: str = "credit") -> None:
                 model_card,
                 config,
             )
+            # On the run, pass or fail, so a failed champion still says why, and
+            # `bankml.registry.promote --run-id` can find the reasons if it is overridden.
+            client = mlflow.MlflowClient()
+            client.set_tag(run_id, "gate", "passed" if gate_result.passed else "failed")
+            client.set_tag(run_id, "gate_reasons", json.dumps(gate_result.reasons))
             if gate_result.passed:
                 version, decision = register_and_promote(
                     run_id,
@@ -203,6 +210,9 @@ def main(domain: str = "credit") -> None:
                 print(f"  {decision.reason}")
             else:
                 print(f"Gate FAILED — not promoted. Reasons: {gate_result.reasons}")
+                print(f"  Run {run_id} is tagged gate=failed. Overriding it is a written decision:")
+                print(f"  python -m bankml.registry.promote --domain {domain} --run-id {run_id} \\")
+                print('    --reason "<why, and the ADR that records it>"')
 
 
 if __name__ == "__main__":

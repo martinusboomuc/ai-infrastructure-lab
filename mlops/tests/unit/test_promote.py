@@ -11,6 +11,7 @@ from bankml.registry.promote import (
     PREVIOUS_PRODUCTION,
     PRODUCTION,
     decide_promotion,
+    promote_despite_gate,
     register_and_promote,
     set_production,
 )
@@ -109,3 +110,45 @@ def test_a_candidate_can_be_promoted_by_hand(registry):
 
     assert str(registry.get_model_version_by_alias(NAME, PRODUCTION).version) == second
     assert str(registry.get_model_version_by_alias(NAME, PREVIOUS_PRODUCTION).version) == first
+
+
+def _failed_champion_run() -> str:
+    with mlflow.start_run() as run:
+        for key, value in _metrics(0.70).items():
+            mlflow.log_metric(f"test_{key}", value)
+        mlflow.set_tags(
+            {
+                "role": "champion",
+                "model_type": "lightgbm",
+                "git_sha": "abc123",
+                "gate": "failed",
+                "gate_reasons": "[\"slice category='home' exceeds its configured tolerance\"]",
+            }
+        )
+        mlflow.pyfunc.log_model(python_model=_Constant(), name="model")
+    return run.info.run_id
+
+
+def test_a_failed_champion_is_promoted_only_with_a_written_reason(registry):
+    run_id = _failed_champion_run()
+
+    with pytest.raises(ValueError, match="written reason"):
+        promote_despite_gate(registry, "fraud-champion", run_id, " ")
+
+    version = promote_despite_gate(registry, "fraud-champion", run_id, "ADR-0024")
+
+    mv = registry.get_model_version("fraud-champion", version)
+    assert mv.tags["gate"] == "failed"
+    assert "home" in mv.tags["gate_reasons"]
+    assert mv.tags["promotion"] == "promoted by hand despite the gate: ADR-0024"
+    assert mv.tags["git_sha"] == "abc123"
+    assert "ADR-0024" in mv.description
+    production = registry.get_model_version_by_alias("fraud-champion", PRODUCTION)
+    assert str(production.version) == version
+
+
+def test_only_a_run_that_failed_the_gate_can_be_overridden(registry):
+    run_id = _logged_run(0.24)
+
+    with pytest.raises(ValueError, match="failed the gate"):
+        promote_despite_gate(registry, "fraud-champion", run_id, "ADR-0024")
