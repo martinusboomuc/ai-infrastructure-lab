@@ -160,6 +160,17 @@ def test_predict_logs_replayed_traffic_as_replay(client, tmp_path):
     assert _logged_records(tmp_path)[-1]["traffic_source"] == "replay"
 
 
+def test_predict_logs_test_bench_traffic_as_test(client, tmp_path):
+    response = client.post(
+        "/predict/credit",
+        json={"applicant_id": 1, "applicant": _valid_applicant()},
+        headers={**AUTH, "X-Traffic-Source": "test"},
+    )
+
+    assert response.status_code == 200
+    assert _logged_records(tmp_path)[-1]["traffic_source"] == "test"
+
+
 def test_predict_rejects_an_unknown_traffic_source(client):
     response = client.post(
         "/predict/credit",

@@ -151,6 +151,21 @@ def test_load_current_reads_local_records_when_azure_is_not_configured(monkeypat
     assert result.iloc[0]["AMT_CREDIT"] == 100.0
 
 
+def test_load_current_skips_test_bench_requests(monkeypatch, tmp_path):
+    monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
+    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+    log_dir = tmp_path / "credit"
+    log_dir.mkdir()
+    test_bench = {**_prediction_record("bench-1", 999.0), "traffic_source": "test"}
+    (log_dir / "2026-01-01.jsonl").write_text(
+        json.dumps(_prediction_record("replay-1", 100.0)) + "\n" + json.dumps(test_bench) + "\n"
+    )
+
+    result = load_current_from_prediction_log("credit")
+
+    assert list(result["AMT_CREDIT"]) == [100.0]
+
+
 def test_load_current_merges_local_and_azure_blob_records(monkeypatch, tmp_path):
     monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
     monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "fake-connection-string")

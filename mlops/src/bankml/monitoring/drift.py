@@ -70,10 +70,15 @@ def load_current_from_prediction_log(
     `since` keeps only records served from then on. `model_version` keeps only predictions made
     by that version: after a promotion, scores from the previous model are not this model's
     behaviour, and comparing them would report the model change itself as prediction drift.
+
+    Requests from the Nexus test bench (`traffic_source` "test", ADR-0025) are skipped: they are
+    applicants someone typed or edited, not the population the model serves.
     """
     records = []
     for rec in read_all_records(domain, since=since):
         if model_version is not None and str(rec.get("model_version")) != str(model_version):
+            continue
+        if rec.get("traffic_source") == "test":
             continue
         row = dict(rec["feature_vector"])
         row["score"] = rec["score"]

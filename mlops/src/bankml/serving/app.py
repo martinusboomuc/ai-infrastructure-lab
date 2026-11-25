@@ -19,7 +19,7 @@ import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import mlflow.artifacts
 import mlflow.pyfunc
@@ -51,6 +51,7 @@ from bankml.validation.fraud.request import TransactionRequestSchema
 logger = logging.getLogger("bankml.serving")
 
 MODEL_ALIAS = "production"
+TrafficSource = Literal["live", "replay", "test"]
 DOMAINS = ("credit", "fraud")
 # A domain the API cannot start without. Fraud joins once it has served for a while.
 REQUIRED_DOMAINS = {"credit"}
@@ -337,9 +338,10 @@ def metrics() -> Response:
 @app.post("/predict/credit")
 def predict_credit(
     payload: CreditPredictionRequest,
-    # Set to "replay" by bankml.monitoring.replay (ADR-0016). Logged with the prediction so
-    # replayed traffic can always be told apart from real requests; anything else is refused.
-    x_traffic_source: Literal["live", "replay"] = Header("live"),
+    # Set to "replay" by bankml.monitoring.replay (ADR-0016), and to "test" by the Nexus test
+    # bench (ADR-0025). Logged with the prediction so neither is mistaken for real traffic by
+    # drift or performance; anything else is refused.
+    x_traffic_source: Annotated[TrafficSource, Header()] = "live",
     client: str = Depends(require_client),
 ) -> dict:
     loaded = _production_model("credit")
@@ -360,7 +362,7 @@ def predict_credit(
 @app.post("/predict/fraud")
 def predict_fraud(
     payload: FraudPredictionRequest,
-    x_traffic_source: Literal["live", "replay"] = Header("live"),
+    x_traffic_source: Annotated[TrafficSource, Header()] = "live",
     client: str = Depends(require_client),
 ) -> dict:
     loaded = _production_model("fraud")
