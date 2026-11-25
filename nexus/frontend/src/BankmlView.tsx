@@ -1,4 +1,5 @@
 import { fetchBankmlModels, type BankmlModel, type ModelVersion } from "./api";
+import { TestBench } from "./TestBench";
 import { usePolling } from "./usePolling";
 
 const POLL_INTERVAL_MS = 60_000;
@@ -167,6 +168,10 @@ export function BankmlView() {
             <ModelCard key={m.domain} model={m} />
           ))}
         </div>
+      </section>
+      <section className="service-layer">
+        <h2 className="service-layer-title">Try a case</h2>
+        <TestBench />
       </section>
     </div>
   );

@@ -673,3 +673,81 @@
     overflow-x: auto;
   }
 }
+
+.bench {
+  max-width: 960px;
+}
+
+.bench-domains {
+  display: flex;
+  gap: 4px;
+}
+
+.bench-picker,
+.bench-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.bench-picker select,
+.bench-field input {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+
+.bench-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.bench-note {
+  margin: 0;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.bench-send {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bench-send:disabled {
+  background: #334155;
+  cursor: progress;
+}
+
+.bench-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #334155;
+}
+
+.bench-decision {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.bench-decision.flag {
+  color: #fbbf24;
+}
+
+.bench-decision.pass {
+  color: #4ade80;
+}

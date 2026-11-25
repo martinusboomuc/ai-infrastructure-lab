@@ -38,6 +38,14 @@ spec:
             - secretRef:
                 name: grafana-token
                 optional: true
+            # The BankML test bench (mlops ADR-0025): the `nexus` API key and a read-only SAS URL
+            # for each domain's examples. Optional: without them the bench says what is missing.
+            - secretRef:
+                name: bankml-api-key
+                optional: true
+            - secretRef:
+                name: bankml-examples
+                optional: true
           readinessProbe:
             httpGet:
               path: /health

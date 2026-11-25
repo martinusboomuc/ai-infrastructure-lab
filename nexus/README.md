@@ -53,6 +53,17 @@ Detection. For each one it shows:
 The backend reads the MLflow registry over the LAN (`MLFLOW_API_URL`) and the monitoring gauges
 from Prometheus. It only reads; promotion stays a command run on `docker-01`.
 
+Below the models is a test bench (mlops ADR-0025). It offers 50 real held-out applicants or
+transactions per model, each with what actually happened to it. Any field can be changed before
+sending the case to the production model. The result shows the score, the threshold, the
+decision and the reason codes.
+
+- **The requests go through the backend,** with the `nexus` API key from the Secret
+  `bankml-api-key`, and as `X-Traffic-Source: test`, which drift and performance monitoring skip.
+- **The browser never holds a key.**
+- **The examples are read through a read-only SAS URL per domain,** from the Secret
+  `bankml-examples`. Both Secrets are optional: without them the bench says what is missing.
+
 What it costs and does not do:
 
 - three.js adds about 330 kB gzipped. It is a separate chunk, loaded only for the room.

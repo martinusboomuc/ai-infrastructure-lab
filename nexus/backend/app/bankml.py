@@ -17,6 +17,7 @@ import httpx
 
 from app.links import MLFLOW_URL
 from app.prometheus import PROMETHEUS_URL
+from app.services import BANKML_API_URL
 
 # The registry's API over the LAN, reachable from the cluster. MLFLOW_URL is the browser's link.
 MLFLOW_API_URL = os.environ.get("MLFLOW_API_URL", "http://192.168.1.115:5000")
@@ -173,3 +174,72 @@ async def _model(client: httpx.AsyncClient, domain: str) -> Model:
 async def get_models() -> list[Model]:
     async with httpx.AsyncClient(timeout=5.0) as client:
         return list(await asyncio.gather(*(_model(client, domain) for domain in DOMAINS)))
+
+
+# The test bench (mlops ADR-0025). The examples are real held-out requests with their outcome,
+# published to the private `replay` container on docker-01. Each domain's file is read through its
+# own read-only SAS URL, so Nexus holds no account key and can read nothing else.
+# The `nexus` client key (mlops ADR-0017). Never sent to the browser.
+_API_KEY = os.environ.get("BANKML_API_KEY", "")
+# A scale-to-zero cold start loads both models before it answers.
+_PREDICT_TIMEOUT_S = 120.0
+_EXAMPLES_TTL_S = 3600.0
+_examples_cache: dict[str, tuple[float, dict]] = {}
+
+
+class TestBenchError(Exception):
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+
+
+def _examples_url(domain: str) -> str:
+    return os.environ.get(f"BANKML_EXAMPLES_URL_{domain.upper()}", "")
+
+
+async def get_examples(domain: str) -> dict:
+    """`{domain, id_field, examples: [{id, outcome, request}]}`, cached for an hour."""
+    if domain not in DOMAINS:
+        raise TestBenchError(404, f"unknown domain {domain!r}")
+    url = _examples_url(domain)
+    if not url:
+        raise TestBenchError(503, f"no examples configured for {domain}")
+    cached = _examples_cache.get(domain)
+    now = asyncio.get_running_loop().time()
+    if cached and now - cached[0] < _EXAMPLES_TTL_S:
+        return cached[1]
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise TestBenchError(502, f"could not read the {domain} examples: {exc}") from exc
+    examples = response.json()
+    _examples_cache[domain] = (now, examples)
+    return examples
+
+
+async def predict(domain: str, request: dict) -> dict:
+    """Send one request to the production model as test traffic, which drift and performance
+    skip. The API's own validation decides what is acceptable; its 422 detail is passed on."""
+    if domain not in DOMAINS:
+        raise TestBenchError(404, f"unknown domain {domain!r}")
+    if not _API_KEY:
+        raise TestBenchError(503, "no BankML API key configured")
+    async with httpx.AsyncClient(timeout=_PREDICT_TIMEOUT_S) as client:
+        try:
+            response = await client.post(
+                f"{BANKML_API_URL}/predict/{domain}",
+                json=request,
+                headers={"Authorization": f"Bearer {_API_KEY}", "X-Traffic-Source": "test"},
+            )
+        except httpx.HTTPError as exc:
+            raise TestBenchError(502, f"the BankML API did not answer: {exc}") from exc
+    if response.status_code != 200:
+        try:
+            detail = response.json().get("detail", response.text)
+        except ValueError:
+            detail = response.text
+        raise TestBenchError(response.status_code, str(detail))
+    return response.json()

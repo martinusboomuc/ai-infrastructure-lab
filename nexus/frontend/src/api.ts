@@ -135,3 +135,58 @@ export async function fetchBankmlModels(): Promise<BankmlModel[]> {
   const data = await response.json();
   return data.models;
 }
+
+// The test bench (mlops ADR-0025): real held-out requests with their known outcome, and a
+// prediction from the production model sent as test traffic.
+export interface Example {
+  id: string;
+  outcome: number;
+  request: Record<string, unknown>;
+}
+
+export interface ExamplesResponse {
+  domain: string;
+  id_field: string;
+  examples: Example[];
+}
+
+export interface Prediction {
+  request_id: string;
+  model_version: string;
+  score: number;
+  decision: "flag" | "pass";
+  threshold: number;
+  reason_codes: { feature: string; shap_value: number }[];
+}
+
+async function detailOf(response: Response): Promise<string> {
+  try {
+    const body = await response.json();
+    return typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+  } catch {
+    return `${response.status}`;
+  }
+}
+
+export async function fetchExamples(domain: string): Promise<ExamplesResponse> {
+  const response = await fetch(`/api/bankml/examples/${domain}`);
+  if (!response.ok) {
+    throw new Error(await detailOf(response));
+  }
+  return response.json();
+}
+
+export async function predict(
+  domain: string,
+  request: Record<string, unknown>,
+): Promise<Prediction> {
+  const response = await fetch(`/api/bankml/predict/${domain}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    throw new Error(await detailOf(response));
+  }
+  return response.json();
+}
