@@ -4,6 +4,9 @@ domain: credit
 
 entity_key: SK_ID_CURR
 target: TARGET
+# What a serving request calls the entity_key. The prediction log, the replay requests and the
+# outcome feed use this name.
+request_id_field: applicant_id
 
 raw_data:
   directory: raw/credit/ # under $BANKML_DATA_ROOT

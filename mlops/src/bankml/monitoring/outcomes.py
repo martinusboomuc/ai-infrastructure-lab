@@ -1,4 +1,4 @@
-"""The outcome feed for replayed applicants (ADR-0021).
+"""The outcome feed for replayed applicants and transactions (ADR-0021).
 
 A bank learns whether a loan defaulted from its servicing system, months after the decision. This
 project has no such system, but every replayed applicant is a real held-out Home Credit applicant
@@ -16,6 +16,7 @@ import argparse
 import io
 import json
 import os
+from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
@@ -35,17 +36,20 @@ def _outcomes_blob(domain: str) -> str:
     return f"{domain}/outcomes.csv"
 
 
-def replayed_applicant_ids(request_lines: list[str]) -> set[int]:
-    return {int(json.loads(line)["applicant_id"]) for line in request_lines}
+def replayed_ids(request_lines: Iterable[str], field: str) -> set[str]:
+    """The entity ids in the replay requests, as strings: Credit Risk's are integers and Fraud's
+    are hashes, and one type keeps the outcome table and its lookups the same for both."""
+    return {str(json.loads(line)[field]) for line in request_lines}
 
 
-def build_outcomes(features: pd.DataFrame, applicant_ids: set[int], config: dict) -> pd.DataFrame:
-    """The known outcome of each replayed applicant, from the domain's processed feature set."""
-    key, target = config["entity_key"], config["target"]
-    known = features[features[key].isin(applicant_ids)].dropna(subset=[target])
+def build_outcomes(features: pd.DataFrame, ids: set[str], config: dict) -> pd.DataFrame:
+    """The known outcome of each replayed entity, from the domain's processed feature set."""
+    key, target, field = config["entity_key"], config["target"], config["request_id_field"]
+    keys = features[key].astype(str)
+    known = features[keys.isin(ids)].dropna(subset=[target])
     return pd.DataFrame(
-        {"applicant_id": known[key].astype(int), "outcome": known[target].astype(int)}
-    ).drop_duplicates("applicant_id")
+        {field: known[key].astype(str), "outcome": known[target].astype(int)}
+    ).drop_duplicates(field)
 
 
 def publish_outcomes(domain: str) -> int:
@@ -55,7 +59,8 @@ def publish_outcomes(domain: str) -> int:
         data_root / "processed" / domain / "features.parquet",
         columns=[config["entity_key"], config["target"]],
     )
-    outcomes = build_outcomes(features, replayed_applicant_ids(load_requests(domain)), config)
+    ids = replayed_ids(load_requests(domain), config["request_id_field"])
+    outcomes = build_outcomes(features, ids, config)
     _container().upload_blob(
         _outcomes_blob(domain), outcomes.to_csv(index=False).encode("utf-8"), overwrite=True
     )
@@ -63,14 +68,16 @@ def publish_outcomes(domain: str) -> int:
 
 
 def load_outcomes(domain: str) -> pd.Series:
-    """`applicant_id -> outcome` (1 = defaulted) for every replayed applicant."""
+    """`id -> outcome` (1 = defaulted, or fraud) for every replayed entity, keyed by the id as a
+    string."""
+    field = load_domain_config(domain)["request_id_field"]
     raw = _container().download_blob(_outcomes_blob(domain)).readall()
-    frame = pd.read_csv(io.BytesIO(raw))
-    return frame.set_index("applicant_id")["outcome"]
+    frame = pd.read_csv(io.BytesIO(raw), dtype={field: str})
+    return frame.set_index(field)["outcome"]
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Publish the replayed applicants' outcomes.")
+    parser = argparse.ArgumentParser(description="Publish the replayed entities' outcomes.")
     parser.add_argument("--domain", default="credit")
     args = parser.parse_args()
     n = publish_outcomes(args.domain)

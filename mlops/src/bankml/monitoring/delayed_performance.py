@@ -73,14 +73,15 @@ def compute_performance(
     reference: dict[str, float],
     min_labeled: int = DEFAULT_MIN_LABELED,
     min_positives: int = DEFAULT_MIN_POSITIVES,
+    id_field: str = "applicant_id",
 ) -> dict[str, Any]:
     """Ranking and decision quality of `records` against `outcomes`.
 
     `reference` holds the version's test metrics (`roc_auc`, `pr_auc`), the numbers it was
-    promoted on.
+    promoted on. `outcomes` is keyed by `id_field` as a string (`outcomes.load_outcomes`).
     """
-    labeled = [r for r in records if r["applicant_id"] in outcomes.index]
-    y_true = pd.Series([int(outcomes[r["applicant_id"]]) for r in labeled], dtype=int)
+    labeled = [r for r in records if str(r[id_field]) in outcomes.index]
+    y_true = pd.Series([int(outcomes[str(r[id_field])]) for r in labeled], dtype=int)
     result: dict[str, Any] = {
         "n_in_window": len(records),
         "n_labeled": len(labeled),
@@ -175,7 +176,9 @@ def run_performance_job(
             "n_labeled": 0,
             "n_positive": 0,
         }
-    return {**window, **compute_performance(records, load_outcomes(domain), reference)}
+    id_field = load_domain_config(domain)["request_id_field"]
+    performance = compute_performance(records, load_outcomes(domain), reference, id_field=id_field)
+    return {**window, **performance}
 
 
 def log_performance_run(domain: str, result: dict[str, Any]) -> str:

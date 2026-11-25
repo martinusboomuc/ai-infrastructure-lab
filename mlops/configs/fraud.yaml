@@ -8,6 +8,8 @@ domain: fraud
 # transactions the velocity/geo/recency features are computed from.
 entity_key: trans_num
 target: TARGET
+# What a serving request calls the entity_key (credit.yaml has the same key).
+request_id_field: transaction_id
 
 raw_data:
   directory: raw/fraud/ # under $BANKML_DATA_ROOT

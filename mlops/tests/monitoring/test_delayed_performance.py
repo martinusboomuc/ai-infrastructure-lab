@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from bankml.monitoring.delayed_performance import compute_performance, select_window
-from bankml.monitoring.outcomes import build_outcomes, replayed_applicant_ids
+from bankml.monitoring.outcomes import build_outcomes, replayed_ids
 
 NOW = datetime(2026, 11, 30, tzinfo=UTC)
 REFERENCE = {"roc_auc": 0.75, "pr_auc": 0.22}
@@ -54,7 +54,7 @@ def _scored(n=1000, separation=1.5, seed=0):
         _record(i, score=float(s), decision="flag" if s >= threshold else "pass")
         for i, s in enumerate(score)
     ]
-    return records, pd.Series(outcome, index=range(n))
+    return records, pd.Series(outcome, index=[str(i) for i in range(n)])
 
 
 def test_a_model_that_ranks_as_well_as_on_test_is_not_degraded():
@@ -100,17 +100,17 @@ def test_predictions_without_a_published_outcome_are_not_counted():
 
 
 def test_outcomes_cover_only_replayed_applicants_with_a_known_target():
-    config = {"entity_key": "SK_ID_CURR", "target": "TARGET"}
+    config = {"entity_key": "SK_ID_CURR", "target": "TARGET", "request_id_field": "applicant_id"}
     features = pd.DataFrame({"SK_ID_CURR": [1, 2, 3, 4], "TARGET": [0, 1, None, 1]})
-    ids = replayed_applicant_ids(
-        ['{"applicant_id": 1}', '{"applicant_id": 2}', '{"applicant_id": 3}']
+    ids = replayed_ids(
+        ['{"applicant_id": 1}', '{"applicant_id": 2}', '{"applicant_id": 3}'], "applicant_id"
     )
 
     outcomes = build_outcomes(features, ids, config)
 
     assert outcomes.to_dict("records") == [
-        {"applicant_id": 1, "outcome": 0},
-        {"applicant_id": 2, "outcome": 1},
+        {"applicant_id": "1", "outcome": 0},
+        {"applicant_id": "2", "outcome": 1},
     ]
 
 
@@ -153,3 +153,18 @@ def test_a_measured_run_publishes_the_live_metrics():
     assert pushed["bankml_performance_measured"] == 1
     assert pushed["bankml_performance_roc_auc"] == result["roc_auc"]
     assert pushed["bankml_performance_roc_auc_drop"] == result["roc_auc_drop"]
+
+
+def test_fraud_outcomes_are_keyed_by_transaction_hash():
+    config = {"entity_key": "trans_num", "target": "TARGET", "request_id_field": "transaction_id"}
+    features = pd.DataFrame({"trans_num": ["0a1b", "123", "ffff"], "TARGET": [0, 1, 0]})
+    ids = replayed_ids(
+        ['{"transaction_id": "0a1b"}', '{"transaction_id": "123"}'], "transaction_id"
+    )
+
+    outcomes = build_outcomes(features, ids, config)
+
+    assert outcomes.to_dict("records") == [
+        {"transaction_id": "0a1b", "outcome": 0},
+        {"transaction_id": "123", "outcome": 1},
+    ]
