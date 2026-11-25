@@ -90,3 +90,48 @@ export async function fetchAlerts(): Promise<AlertsResponse> {
   }
   return response.json();
 }
+
+// BankML's registered models, read live from the MLflow registry and the monitoring gauges.
+export interface ModelVersion {
+  version: string;
+  aliases: string[];
+  created_ms: number;
+  model_type: string;
+  gate: string;
+  gate_reasons: string[];
+  promotion: string;
+  metrics: Partial<Record<"pr_auc" | "roc_auc" | "recall_at_target_fpr" | "expected_cost", number>>;
+  description: string;
+  mlflow_url: string;
+}
+
+export interface Monitoring {
+  performance: Partial<
+    Record<
+      "measured" | "n_labeled" | "n_positive" | "roc_auc" | "test_roc_auc" | "roc_auc_drop",
+      number
+    >
+  >;
+  drift_detected: boolean | null;
+  drift_last_run_s: number | null;
+}
+
+export interface BankmlModel {
+  domain: string;
+  title: string;
+  purpose: string;
+  registered_name: string;
+  production_version: string | null;
+  versions: ModelVersion[];
+  monitoring: Monitoring;
+  error: string | null;
+}
+
+export async function fetchBankmlModels(): Promise<BankmlModel[]> {
+  const response = await fetch("/api/bankml/models");
+  if (!response.ok) {
+    throw new Error(`models fetch failed: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.models;
+}

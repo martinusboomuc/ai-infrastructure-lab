@@ -13,6 +13,8 @@ configMapGenerator:
   - name: backend-config
     literals:
       - PROMETHEUS_URL=http://192.168.1.136:9090
+      # The MLflow registry over the LAN, for the BankML view. Read only.
+      - MLFLOW_API_URL=http://192.168.1.115:5000
       # Channel links, not webhooks: they only open the channel for members of the server.
       - DISCORD_HOMELAB_CHANNEL_URL=https://discord.com/channels/1483548053096103978/1552287236668784690
       - DISCORD_BANKML_CHANNEL_URL=https://discord.com/channels/1483548053096103978/1483548053859205354

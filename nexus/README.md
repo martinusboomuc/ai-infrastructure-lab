@@ -39,6 +39,20 @@ and its live ROC-AUC on replayed applicants with known outcomes, or how many of 
 have arrived (mlops ADR-0021). The backend reads them from the gauges the performance job pushes,
 and links to the "BankML Model Performance" Grafana dashboard.
 
+The **BankML** tab in the list view shows each model the bank runs, Credit Risk and Fraud
+Detection. For each one it shows:
+
+- what the model decides;
+- which version serves, with its test metrics;
+- whether that version passed the promotion gate, or failed it and was promoted by hand with a
+  written reason (mlops ADR-0024);
+- its live ROC-AUC, or how far it is from being measured;
+- whether its inputs drifted;
+- every registered version, with its aliases and a link to it in MLflow.
+
+The backend reads the MLflow registry over the LAN (`MLFLOW_API_URL`) and the monitoring gauges
+from Prometheus. It only reads; promotion stays a command run on `docker-01`.
+
 What it costs and does not do:
 
 - three.js adds about 330 kB gzipped. It is a separate chunk, loaded only for the room.

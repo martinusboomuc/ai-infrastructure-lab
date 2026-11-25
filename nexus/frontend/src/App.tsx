@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertsList, AlertsView } from "./AlertsView";
+import { BankmlView } from "./BankmlView";
 import { fetchAlerts, fetchServices, fetchTopology } from "./api";
 import { Hud } from "./Hud";
 import { NodeDetailPanel } from "./NodeDetailPanel";
@@ -25,7 +26,7 @@ function webglAvailable(): boolean {
   }
 }
 
-const LIST_VIEWS = { services: "Services", alerts: "Alerts" } as const;
+const LIST_VIEWS = { services: "Services", bankml: "BankML", alerts: "Alerts" } as const;
 type ListView = keyof typeof LIST_VIEWS;
 
 function ListMode({ onWorld }: { onWorld: (() => void) | null }) {
@@ -56,6 +57,7 @@ function ListMode({ onWorld }: { onWorld: (() => void) | null }) {
         )}
       </header>
       {view === "services" && <ServicesView />}
+      {view === "bankml" && <BankmlView />}
       {view === "alerts" && <AlertsView />}
     </div>
   );

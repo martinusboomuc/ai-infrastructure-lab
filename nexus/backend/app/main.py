@@ -11,6 +11,7 @@ from dataclasses import asdict
 from fastapi import FastAPI
 
 from app.alerts import discord_channels, get_alerts
+from app.bankml import get_models
 from app.services import get_services
 from app.topology import get_topology
 
@@ -31,6 +32,11 @@ async def services():
 @app.get("/api/alerts")
 async def alerts():
     return asdict(await get_alerts())
+
+
+@app.get("/api/bankml/models")
+async def bankml_models():
+    return {"models": [asdict(m) for m in await get_models()]}
 
 
 @app.get("/health")
