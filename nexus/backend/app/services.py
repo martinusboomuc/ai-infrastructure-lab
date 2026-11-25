@@ -316,7 +316,11 @@ _CATALOG: list[tuple[Service, _Check]] = [
 
 
 async def _up_by_job(client: httpx.AsyncClient) -> dict[str, bool]:
-    response = await client.get(f"{PROMETHEUS_URL}/api/v1/query", params={"query": "up"})
+    # The last scrape within 2 hours, not `up`: the BankML API is scraped hourly so it can scale
+    # to zero, and an instant `up` query only looks back 5 minutes.
+    response = await client.get(
+        f"{PROMETHEUS_URL}/api/v1/query", params={"query": "last_over_time(up[2h])"}
+    )
     response.raise_for_status()
     up: dict[str, bool] = {}
     for row in response.json()["data"]["result"]:
