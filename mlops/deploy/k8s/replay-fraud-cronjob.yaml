@@ -1,0 +1,78 @@
+# Daily replay of held-out Fraud transactions through the deployed API (ADR-0016, ADR-0023).
+# 1,000 a day, not Credit Risk's 200: fraud is 0.38% of transactions, and the performance job
+# needs 25 frauds in its 30-day window. The request file (about 80 MB compressed) is built once
+# on docker-01 by `python -m bankml.features.fraud.replay` (see README.md) and read in a stream.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: replay-fraud
+  labels:
+    app.kubernetes.io/name: bankml-replay
+spec:
+  schedule: "15 5 * * *"
+  timeZone: Europe/Lisbon
+  # Two runs at once would read the same cursor and send the same applicants twice.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # No retry: a rerun after a partial failure would resend the batch from the old cursor.
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: bankml-replay
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: replay
+              image: ghcr.io/martinusboomuc/ai-infrastructure-lab/bankml-serving
+              command:
+                - python
+                - -m
+                - bankml.monitoring.replay
+                - --domain
+                - fraud
+                - --batch-size
+                - "1000"
+              envFrom:
+                - configMapRef:
+                    name: bankml-config
+                - secretRef:
+                    name: azure-storage
+              env:
+                # The `replay` client key (ADR-0017). Created by hand, never committed.
+                - name: BANKML_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: bankml-api-key
+                      key: BANKML_API_KEY
+              resources:
+                # The compressed file is held in memory and read one line at a time: 137 MB
+                # measured for a batch of 1,000.
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi

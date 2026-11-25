@@ -1,8 +1,9 @@
 # BankML on k3s
 
-Three daily CronJobs for Credit Risk on `k8s-01`: replayed traffic at 05:00, the drift check at
-06:00 and production performance at 06:30. The reasoning is in [ADR-0015](../../docs/decisions/0015-scheduled-drift-check-on-k3s.md)
-and [ADR-0016](../../docs/decisions/0016-replay-held-out-applicants-as-traffic.md).
+Daily CronJobs on `k8s-01`. For Credit Risk: replayed traffic at 05:00, the drift check at
+06:00 and production performance at 06:30. For Fraud: replayed traffic at 05:15. The
+reasoning is in [ADR-0015](../../docs/decisions/0015-scheduled-drift-check-on-k3s.md) and
+[ADR-0016](../../docs/decisions/0016-replay-held-out-applicants-as-traffic.md).
 
 ## What runs
 
@@ -19,6 +20,11 @@ than 500 logged predictions it reports `no_data` and pushes only a heartbeat.
 `replay-credit`, daily at 05:00, runs `python -m bankml.monitoring.replay --domain credit
 --batch-size 200`. It posts the next 200 prepared requests to the API on Azure Container Apps
 with `X-Traffic-Source: replay`, and moves the cursor in the `replay` blob container.
+
+`replay-fraud`, daily at 05:15, runs `python -m bankml.monitoring.replay --domain fraud
+--batch-size 1000` ([ADR-0023](../../docs/decisions/0023-serve-fraud-from-the-same-api.md)). A
+Fraud request carries the card's last 30 days, so the file is larger, and the sender streams it.
+Drift and performance for Fraud are not scheduled yet.
 
 `performance-credit`, daily at 06:30, runs `python -m bankml.monitoring.delayed_performance
 --domain credit` ([ADR-0021](../../docs/decisions/0021-production-performance-on-replayed-outcomes.md)).
@@ -46,6 +52,13 @@ whenever the requests are rebuilt:
 
 ```bash
 uv run python -m bankml.monitoring.outcomes --domain credit
+```
+
+Fraud's requests come from the raw Sparkov files the same way: 30,000 test-split transactions,
+one 30-day window at 1,000 a day. It takes about 40 s and 1 GB of memory.
+
+```bash
+uv run python -m bankml.features.fraud.replay --output /tmp/replay/fraud.jsonl.gz --upload
 ```
 
 ## Deploying
