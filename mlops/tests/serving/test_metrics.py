@@ -17,6 +17,25 @@ class _FakeModel:
         return np.column_stack([1 - score, score])
 
 
+def _fake_models() -> dict:
+    return {
+        "credit": app_module.DomainModel(
+            model=_FakeModel(),
+            model_type="lightgbm",
+            model_version="1",
+            threshold=0.5,
+            categories={"NAME_EDUCATION_TYPE": ["Higher education", "Secondary"]},
+        ),
+        "fraud": app_module.DomainModel(
+            model=_FakeModel(),
+            model_type="lightgbm",
+            model_version="4",
+            threshold=0.1,
+            categories={"category": ["grocery_pos", "misc_net"]},
+        ),
+    }
+
+
 def _valid_applicant():
     return {
         "CODE_GENDER": "F",
@@ -54,12 +73,8 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("BANKML_PREDICTION_LOG_DIR", str(tmp_path))
     monkeypatch.setenv("BANKML_API_KEYS", f"prometheus:{PROMETHEUS_KEY}")
 
-    def _fake_load_production_model():
-        app_module.state.model = _FakeModel()
-        app_module.state.model_type = "lightgbm"
-        app_module.state.model_version = "1"
-        app_module.state.threshold = 0.5
-        app_module.state.categories = {"NAME_EDUCATION_TYPE": ["Higher education", "Secondary"]}
+    def _fake_load_production_model(domain):
+        return _fake_models()[domain]
 
     monkeypatch.setattr(app_module, "load_production_model", _fake_load_production_model)
     monkeypatch.setattr(
