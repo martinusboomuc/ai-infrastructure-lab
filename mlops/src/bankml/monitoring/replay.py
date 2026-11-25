@@ -16,13 +16,16 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import io
 import json
 import os
 import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterator, Sized
 from pathlib import Path
+from typing import Protocol
 
 AZURE_CONTAINER = "replay"
 TRAFFIC_SOURCE_HEADER = "X-Traffic-Source"
@@ -64,9 +67,35 @@ def upload_requests(path: Path, domain: str) -> str:
     return f"{AZURE_CONTAINER}/{_requests_blob(domain)}"
 
 
-def load_requests(domain: str) -> list[str]:
-    raw = _container().download_blob(_requests_blob(domain)).readall()
-    return [line for line in gzip.decompress(raw).decode("utf-8").splitlines() if line.strip()]
+class RequestLines(Sized, Protocol):
+    def __iter__(self) -> Iterator[str]: ...
+
+
+class RequestFile:
+    """The downloaded request file, kept compressed and decompressed one line at a time.
+
+    Decompressed, the Fraud file is about 420 MB (ADR-0023), more than the replay pod's memory;
+    compressed it is about 75 MB. Each pass over it streams through gzip.
+    """
+
+    def __init__(self, compressed: bytes):
+        self._compressed = compressed
+        self._length: int | None = None
+
+    def __iter__(self) -> Iterator[str]:
+        with gzip.open(io.BytesIO(self._compressed), "rt", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    yield line.rstrip("\n")
+
+    def __len__(self) -> int:
+        if self._length is None:
+            self._length = sum(1 for _ in self)
+        return self._length
+
+
+def load_requests(domain: str) -> RequestFile:
+    return RequestFile(_container().download_blob(_requests_blob(domain)).readall())
 
 
 def read_cursor(domain: str) -> int:
@@ -85,14 +114,17 @@ def write_cursor(domain: str, position: int) -> None:
     )
 
 
-def next_batch(lines: list[str], position: int, batch_size: int) -> tuple[list[str], int]:
+def next_batch(lines: RequestLines, position: int, batch_size: int) -> tuple[list[str], int]:
     """The next `batch_size` requests from `position`, wrapping at the end of the file, and the
-    position the following run starts from.
+    position the following run starts from. Reads `lines` in one pass, keeping only the batch.
     """
-    if not lines:
+    total = len(lines)
+    if not total:
         return [], 0
-    batch = [lines[(position + i) % len(lines)] for i in range(min(batch_size, len(lines)))]
-    return batch, (position + len(batch)) % len(lines)
+    order = [(position + i) % total for i in range(min(batch_size, total))]
+    wanted = set(order)
+    found = {i: line for i, line in enumerate(lines) if i in wanted}
+    return [found[i] for i in order], (position + len(order)) % total
 
 
 def post_request(api_url: str, endpoint: str, body: str, api_key: str) -> int:

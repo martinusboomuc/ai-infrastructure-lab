@@ -30,6 +30,18 @@ def test_next_batch_of_an_empty_file_is_empty():
     assert replay.next_batch([], position=7, batch_size=10) == ([], 0)
 
 
+def test_a_request_file_streams_its_lines_and_skips_blank_ones():
+    import gzip
+
+    request_file = replay.RequestFile(gzip.compress(b'{"a": 1}\n\n{"a": 2}\n{"a": 3}\n'))
+
+    assert len(request_file) == 3
+    assert replay.next_batch(request_file, position=2, batch_size=2) == (
+        ['{"a": 3}', '{"a": 1}'],
+        1,
+    )
+
+
 class _Response:
     def __init__(self, status):
         self.status = status
